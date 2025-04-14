@@ -89,19 +89,25 @@ class Parser:
         var_name = self.current_tok
         next_tok = self.peek()
 
+        print(f"{var_name}, {next_tok}")
+
 
         if (self.current_tok.type == TT_IDENTIFIER):
+            print(f"reassigment for {var_name}")
             if (next_tok.type == TT_EQ):  # Check if next token is '='
+                print(f"= found")
                 self.advance()  # Advance to '='
                 self.advance()  # Advance to the value
                 value = res.register(self.expr())  # Parse the expression
+                print(f"p to {value}")
                 if res.error:
                     return res
                 return res.success(VarReAssignNode(var_name, value)) 
             
             else:
+                print(f"= not found")
                 pass
-            
+
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
 
@@ -263,7 +269,7 @@ class Parser:
                 return res
             body.append(stmt)
 
-            if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
 
