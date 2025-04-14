@@ -20,29 +20,33 @@ class Compiler:
         self.env = Environment()
 
     def compile(self, node):
-        if isinstance(node, ProgramNode):
-            self.__compile_program(node)
-        elif isinstance(node, ExpressionStatement):
-            self.__compile_expression_statement(node)
-        elif isinstance(node, BinOpNode):
-            return self.__compile_bin_op(node)
-        elif isinstance(node, NumberNode):
-            return self.__compile_number(node)
-        elif isinstance(node, VarAssignNode):
-            return self.__compile_var_assign(node)
-        elif isinstance(node, VarReAssignNode):
-            return self.__compile_var_reassign(node)
-        elif isinstance(node, VarAccessNode):
-            return self.__compile_var_access(node)
-        elif isinstance(node, FunctionNode):
-            return self.__compile_function(node)
-        elif isinstance(node, FunctionCallNode):
-            return self.__compile_function_call(node)
-        elif isinstance(node, ReturnNode):  # Handle ReturnNode
-            self.__compile_return(node)
-        else:
-            raise Exception(f"Unknown node type: {type(node)}")
-        
+        try:
+            if isinstance(node, ProgramNode):
+                self.__compile_program(node)
+            elif isinstance(node, ExpressionStatement):
+                self.__compile_expression_statement(node)
+            elif isinstance(node, BinOpNode):
+                return self.__compile_bin_op(node)
+            elif isinstance(node, NumberNode):
+                return self.__compile_number(node)
+            elif isinstance(node, VarAssignNode):
+                return self.__compile_var_assign(node)
+            elif isinstance(node, VarReAssignNode):
+                return self.__compile_var_reassign(node)
+            elif isinstance(node, VarAccessNode):
+                return self.__compile_var_access(node)
+            elif isinstance(node, FunctionNode):
+                return self.__compile_function(node)
+            elif isinstance(node, FunctionCallNode):
+                return self.__compile_function_call(node)
+            elif isinstance(node, ReturnNode):  # Handle ReturnNode
+                self.__compile_return(node)
+            else:
+                raise Exception(f"Unknown node type: {type(node)}")
+        except Exception as e:
+            print(f"[ERROR] Compilation failed: {str(e)}")
+            raise e
+
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
         print(f"Compiling function: {func_name}")
@@ -50,12 +54,11 @@ class Compiler:
         param_types = [self.type_map[param_type_tok.value] for (_, param_type_tok) in node.param_toks]
         print(f"[DEBUG] Parameter types for function '{func_name}': {param_types}")
 
-
         print(type(node.return_type))
         return_type = self.type_map[node.return_type.value]
-
         print(f"Function return type: {return_type}")
 
+        # Check if function return type is void
         fn_type = ir.FunctionType(return_type, param_types)
 
         func = ir.Function(self.module, fn_type, name=func_name)
@@ -81,9 +84,10 @@ class Compiler:
                 print(f"[DEBUG] Inferred return type: {inferred_type}, Expected: {return_type}")
                 if inferred_type != return_type:
                     raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
-            
+
             self.compile(stmt)
 
+        # Ensure the function returns correctly
         if not self.builder.block.is_terminated:
             print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
             if return_type == self.type_map["void"]:
@@ -100,19 +104,21 @@ class Compiler:
     def __compile_function_call(self, node):
         func_name = node.func_name_tok.value
         func = self.module.get_global(func_name)
-        
+
         if func is None:
             raise Exception(f"Function '{func_name}' not declared")
-        
+
         args = [self.__resolve_value(arg)[0] for arg in node.arg_nodes]
 
         if len(args) != len(func.args):
             raise Exception(f"Function '{func_name}' expects {len(func.args)} arguments, but {len(args)} were provided")
-   
 
-        self.builder.call(func, args)
+        call_result = self.builder.call(func, args)
 
+        # Infer return type from function type
+        return_type = func.function_type.return_type
 
+        return call_result, return_type
 
     def __compile_block(self, node):
         for stmt in node.statements:
@@ -123,7 +129,6 @@ class Compiler:
 
         # Add return instruction to the builder
         self.builder.ret(return_value)
-
 
     def __compile_program(self, node):
         func_name = "main"
@@ -219,13 +224,11 @@ class Compiler:
         ptr, existing_type, initialized = existing
 
         if existing_type != type:
-            raise Exception(f"Type mismatch can not assign value of type {type} to variable '{var_name} of type {existing_type}'")
+            raise Exception(f"Type mismatch cannot assign value of type {type} to variable '{var_name}' of type {existing_type}")
         
         self.builder.store(value, ptr)
-
         self.env.set_initialized(var_name)
 
-        
     def __compile_var_access(self, node):
         var_name = node.var_name_tok.value
         entry = self.env.lookup(var_name)
@@ -238,7 +241,6 @@ class Compiler:
 
         return self.builder.load(ptr), typ
 
-
     def __resolve_value(self, node):
         if isinstance(node, NumberNode):
             val = node.tok.value
@@ -250,5 +252,7 @@ class Compiler:
             return self.__compile_bin_op(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
+        elif isinstance(node, FunctionCallNode):
+            return self.__compile_function_call(node)
 
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")

@@ -1,6 +1,10 @@
-
-
-fn maz() : void {
+fn maz() : int {
     var z = 10;
     z = 100;
+    return z;
 }
+fn riz() : int {
+    var ab = maz();
+    return ab;
+}
+
