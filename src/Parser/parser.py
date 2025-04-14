@@ -93,7 +93,7 @@ class Parser:
 
 
         if (self.current_tok.type == TT_IDENTIFIER):
-            print(f"reassigment for {var_name}")
+            
             if (next_tok.type == TT_EQ):  # Check if next token is '='
                 print(f"= found")
                 self.advance()  # Advance to '='
@@ -269,6 +269,7 @@ class Parser:
                 return res
             body.append(stmt)
 
+            
             if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
@@ -343,6 +344,7 @@ class Parser:
                     self.current_tok.pos_end,
                     "Expected ')'"
                 ))
+        
         return res.failure(InvalidSyntaxError(
             tok.pos_start,
             tok.pos_end,
