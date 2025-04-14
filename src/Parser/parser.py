@@ -248,7 +248,35 @@ class Parser:
             return res.success(NumberNode(tok))
         elif tok.type == TT_IDENTIFIER:
             self.advance()
+            
+            #check for fncn calls
+            if self.current_tok.type == TT_LPAREN:
+                self.advance()
+                arg_nodes = []
+
+                if self.current_tok.type != TT_RPAREN:
+                    arg_nodes.append(res.register(self.expr()))
+                    if res.error:
+                        return res
+                    
+                    while self.current_tok.type == TT_COMMA:
+                        self.advance()
+                        arg_nodes.append(res.register(self.expr()))
+                        if res.error:
+                            return res
+                        
+                    if self.current_tok.type != TT_RPAREN:
+                        return res.failure(InvalidSyntaxError(
+                            self.current_tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected a closing parenthesis ')'"
+                        ))
+                    
+                self.advance()
+                return res.success(FunctionCallNode(tok, arg_nodes))
+                
             return res.success(VarAccessNode(tok))
+        
         elif tok.type == TT_LPAREN:
             self.advance()
             expr = res.register(self.expr())

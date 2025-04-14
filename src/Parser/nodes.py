@@ -136,6 +136,25 @@ class FunctionNode:
             "body": self.body_node.json(),
         }
     
+class FunctionCallNode:
+    def __init__(self, func_name_tok, arg_nodes):
+        self.func_name_tok = func_name_tok
+        self.arg_nodes = arg_nodes
+
+        self.pos_start = self.func_name_tok.pos_start
+        self.pos_end = self.arg_nodes[-1].pos_end if self.arg_nodes else self.func_name_tok.pos_end
+
+    
+    def __repr__(self):
+        return f"FunctionCallNode({repr(self.func_name_tok)}, {self.arg_nodes})"
+
+    def json(self):
+        return {
+            "type": "FunctionCall", 
+            "name": self.func_name_tok.value,
+            "arguments": [arg.json() for arg in self.arg_nodes]
+        }
+    
 
 class NumberNode:
     def __init__(self, tok):

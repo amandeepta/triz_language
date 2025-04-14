@@ -29,8 +29,62 @@ class Compiler:
             return self.__compile_var_assign(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
+        elif isinstance(node, FunctionNode):
+            return self.__compile_function(node)
+        elif isinstance(node, FunctionCallNode):
+            return self.__compile_function_call(node)
         else:
             raise Exception(f"Unknown node type: {type(node)}")
+        
+    def __compile_function(self, node):
+        func_name = node.func_name_tok.value
+        param_types = [self.type_map[param.type] for param in node.param_toks ]
+        
+        fn_type = ir.FunctionType(self.type_map["void"], param_types)
+        func = ir.Function(self.module, fn_type, name=func_name)
+
+        block = func.append_basic_block(f"{func_name}_entry")
+        self.builder = ir.IRBuilder(block)
+        self.env = Environment(parent=self.env)
+
+        for i, param_tok in enumerate(node.param_toks):
+            param_name = param_tok.value
+            ptr = self.builder.alloca(param_types[i], name=param_name)
+            self.builder.store(func.args[i], ptr)
+            self.env.define(param_name, ptr, param_types[i], initialized=True)
+
+        for stmt in node.body_node.statements:
+            self.compile(stmt)
+
+        if not self.builder.block.is_terminated:
+            self.builder.ret_void()
+
+        self.env = self.env.parent
+
+    def __compile_function_call(self, node):
+        func_name = node.func_name_tok.value
+        func = self.module.get_global(func_name)
+        
+        if func is None:
+            raise Exception(f"Function '{func_name}' not declared")
+        
+        args = [self.__resolve_value(arg)[0] for arg in node.arg_nodes]
+
+        if len(args) != len(func.args):
+            raise Exception(f"Function '{func_name}' expects {len(func.args)} arguments, but {len(args)} were provided")
+   
+
+        self.builder.call(func, args)
+
+
+
+    def __compile_block(self, node):
+        for stmt in node.statements:
+            self.compile(stmt)
+
+    def __compile_return(self, node):
+        for stmt in node.statements:
+            self.compile(stmt)
 
     def __compile_program(self, node):
         func_name = "main"
@@ -47,7 +101,9 @@ class Compiler:
             self.compile(stmt)
 
         return_value = ir.Constant(self.type_map["int"], 0)
-        self.builder.ret(return_value)
+        # Ensure the block is not already terminated before adding a return
+        if not self.builder.block.is_terminated:
+            self.builder.ret(return_value)
 
         print(self.module)
         return self.module 
