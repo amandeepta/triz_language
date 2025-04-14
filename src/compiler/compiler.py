@@ -84,7 +84,8 @@ class Compiler:
                 print(f"[DEBUG] Inferred return type: {inferred_type}, Expected: {return_type}")
                 if inferred_type != return_type:
                     raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
-
+                self.builder.ret(return_value)  # emit return here itself
+                continue
             self.compile(stmt)
 
         # Ensure the function returns correctly

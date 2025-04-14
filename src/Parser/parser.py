@@ -150,7 +150,8 @@ class Parser:
                 ))
             var_name = self.current_tok
             self.advance()
-
+            if self.current_tok.type is TT_SEMI :
+                return res.success(VarAssignNode(var_name, None))
             if self.current_tok.type != TT_EQ:
                 return res.failure(InvalidSyntaxError(
                     self.current_tok.pos_start,
