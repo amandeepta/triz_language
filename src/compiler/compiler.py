@@ -12,7 +12,10 @@ class Compiler:
             'float': ir.FloatType(),
             'double': ir.DoubleType(),
             'bool': ir.IntType(1),
-            'void': ir.VoidType()
+            'void': ir.VoidType(),
+            "INT": ir.IntType(32),
+            "FLOAT": ir.FloatType(),
+            "VOID": ir.VoidType()
         }
         self.env = Environment()
 
@@ -33,33 +36,64 @@ class Compiler:
             return self.__compile_function(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
+        elif isinstance(node, ReturnNode):  # Handle ReturnNode
+            self.__compile_return(node)
         else:
             raise Exception(f"Unknown node type: {type(node)}")
         
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
-        param_types = [self.type_map[param.type] for param in node.param_toks ]
-        
-        fn_type = ir.FunctionType(self.type_map["void"], param_types)
+        print(f"Compiling function: {func_name}")
+
+        param_types = [self.type_map[param_type_tok.value] for (_, param_type_tok) in node.param_toks]
+        print(f"[DEBUG] Parameter types for function '{func_name}': {param_types}")
+
+
+        print(type(node.return_type))
+        return_type = self.type_map[node.return_type.value]
+
+        print(f"Function return type: {return_type}")
+
+        fn_type = ir.FunctionType(return_type, param_types)
+
         func = ir.Function(self.module, fn_type, name=func_name)
+        print(f"LLVM Function created: {func}")
 
         block = func.append_basic_block(f"{func_name}_entry")
         self.builder = ir.IRBuilder(block)
+
         self.env = Environment(parent=self.env)
 
-        for i, param_tok in enumerate(node.param_toks):
-            param_name = param_tok.value
-            ptr = self.builder.alloca(param_types[i], name=param_name)
+        for i, (param_name_tok, param_type_tok) in enumerate(node.param_toks):
+            llvm_type = self.type_map[param_type_tok.value]
+            ptr = self.builder.alloca(llvm_type, name=param_name_tok.value)
             self.builder.store(func.args[i], ptr)
-            self.env.define(param_name, ptr, param_types[i], initialized=True)
+            self.env.define(param_name_tok.value, ptr, llvm_type, initialized=True)
+            print(f"[DEBUG] Allocated variable '{param_name_tok.value}' of type {llvm_type}")
 
         for stmt in node.body_node.statements:
+            print(f"[DEBUG] Compiling statement: {stmt}")
+            if isinstance(stmt, ReturnNode):
+                print("[DEBUG] Found return statement")
+                return_value, inferred_type = self.__resolve_value(stmt.return_val)
+                print(f"[DEBUG] Inferred return type: {inferred_type}, Expected: {return_type}")
+                if inferred_type != return_type:
+                    raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
+            
             self.compile(stmt)
 
         if not self.builder.block.is_terminated:
-            self.builder.ret_void()
+            print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
+            if declared_return_type == self.type_map["void"]:
+                self.builder.ret_void()
+                print("[DEBUG] Returned void")
+            else:
+                default_ret = ir.Constant(declared_return_type, 0)
+                self.builder.ret(default_ret)
+                print("[DEBUG] Returned default value 0")
 
         self.env = self.env.parent
+        print(f"[INFO] Function '{func_name}' compiled successfully\n")
 
     def __compile_function_call(self, node):
         func_name = node.func_name_tok.value
@@ -83,8 +117,11 @@ class Compiler:
             self.compile(stmt)
 
     def __compile_return(self, node):
-        for stmt in node.statements:
-            self.compile(stmt)
+        return_value, _ = self.__resolve_value(node.return_val)  # Resolve return value
+
+        # Add return instruction to the builder
+        self.builder.ret(return_value)
+
 
     def __compile_program(self, node):
         func_name = "main"

@@ -51,6 +51,8 @@ class Lexer:
                 tokens.append(self.make_simple_token(TT_RBRACE))
             elif self.current == ',':
                 tokens.append(self.make_simple_token(TT_COMMA))
+            elif self.current == ':':
+                tokens.append(self.make_simple_token(TT_COLON))
             elif self.current == '=':
                 token, error = self.make_equals(TT_EQ)
                 if error: return [], error
@@ -79,7 +81,7 @@ class Lexer:
     def make_simple_token(self, type_):
         pos_start = self.pos.copy()
         self.next()
-        pos_end = self.pos.copy()  # Set pos_end to the position after consuming the token.
+        pos_end = self.pos.copy()
         return Token(type_, pos_start=pos_start, pos_end=pos_end)
 
     def make_number(self):
@@ -97,7 +99,7 @@ class Lexer:
 
         value = float(num_str) if has_dot else int(num_str)
         tok_type = TT_FLOAT if has_dot else TT_INT
-        pos_end = self.pos.copy()  # Set pos_end to the position after the number.
+        pos_end = self.pos.copy()
         return Token(tok_type, value, pos_start, pos_end)
 
     def make_identifiers(self):
@@ -108,9 +110,17 @@ class Lexer:
             id_str += self.current
             self.next()
 
-        pos_end = self.pos.copy()  # Set pos_end to the position after the identifier.
-        token_type = TT_KEYWORD if id_str.upper() in KEYWORDS else TT_IDENTIFIER
-        return Token(token_type, id_str.upper() if token_type == TT_KEYWORD else id_str, pos_start, pos_end)
+        pos_end = self.pos.copy()
+        if id_str.upper() in KEYWORDS:  # Check if the identifier is a keyword
+            token_type = TT_KEYWORD
+            value = id_str.upper()
+        elif id_str.upper() in TT_TYPES :
+            token_type = TT_TYPE
+            value = id_str.upper()
+        else:
+            token_type = TT_IDENTIFIER
+            value = id_str
+        return Token(token_type, value, pos_start, pos_end)
 
     def make_not_equals(self):
         pos_start = self.pos.copy()
@@ -149,7 +159,7 @@ def run(text):
     return lexer.make_tokens()
 
 def main():
-    text = "VAR a = 5 + 2; VAR b = 10;"
+    text = "fn mi(a: int, b: float): int { var a = 10; return a; }"
     tokens, error = run(text)
 
     if error:
