@@ -254,5 +254,4 @@ class Compiler:
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
-
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")
