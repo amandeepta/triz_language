@@ -29,7 +29,8 @@ TT_EOF = 'EOF'
 
 TT_TYPES = [
     'INT',
-    'FLOAT'
+    'FLOAT',
+    'VOID'
 ]
 # Keywords
 KEYWORDS = [
@@ -38,7 +39,6 @@ KEYWORDS = [
     'AND',
     'OR',
     'NOT',
-    'MAIN',  # Only if you want 'main' to be a keyword
     'FN',
     'RETURN', 
 ]

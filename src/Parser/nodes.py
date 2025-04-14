@@ -68,6 +68,24 @@ class VarAssignNode:
             "name": self.var_name_tok.value,
             "value": self.value_node.json()
         }
+    
+class VarReAssignNode:
+    def __init__(self, var_name_tok, value_node):
+        self.var_name_tok = var_name_tok
+        self.value_node = value_node
+        self.value = value_node
+        self.pos_start = self.var_name_tok.pos_start
+        self.pos_end = value_node.pos_end if value_node else var_name_tok.pos_end
+
+    def __repr__(self):
+        return f'VarReAssignNode({repr(self.var_name_tok)}, {repr(self.value_node)})'
+
+    def json(self):
+        return {
+            "type": "VarReAssign",
+            "name": self.var_name_tok.value,
+            "value": self.value_node.json()
+        }
 
 
 class ReturnNode:

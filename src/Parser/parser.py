@@ -47,6 +47,11 @@ class Parser:
 
     def __is_at_end(self):
         return self.tok_idx >= len(self.tokens)
+    
+    def peek(self):
+        if self.tok_idx + 1 < len(self.tokens):
+            return self.tokens[self.tok_idx +1]
+        return None
 
     def advance(self):
         self.tok_idx += 1
@@ -67,7 +72,7 @@ class Parser:
                 return res
             program_node.statements.append(stmt)
 
-            if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
                 elif self.current_tok.type != TT_EOF and self.current_tok.type != TT_RBRACE:
@@ -81,6 +86,27 @@ class Parser:
 
     def statement(self):
         res = ParseResult()
+        var_name = self.current_tok
+        next_tok = self.peek()
+
+        print(f"{var_name}, {next_tok}")
+
+
+        if (self.current_tok.type == TT_IDENTIFIER):
+            
+            if (next_tok.type == TT_EQ):  # Check if next token is '='
+                print(f"= found")
+                self.advance()  # Advance to '='
+                self.advance()  # Advance to the value
+                value = res.register(self.expr())  # Parse the expression
+                print(f"p to {value}")
+                if res.error:
+                    return res
+                return res.success(VarReAssignNode(var_name, value)) 
+            
+            else:
+                print(f"= not found")
+                pass
 
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
@@ -243,7 +269,8 @@ class Parser:
                 return res
             body.append(stmt)
 
-            if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
 
@@ -317,6 +344,7 @@ class Parser:
                     self.current_tok.pos_end,
                     "Expected ')'"
                 ))
+        
         return res.failure(InvalidSyntaxError(
             tok.pos_start,
             tok.pos_end,

@@ -30,6 +30,8 @@ class Compiler:
             return self.__compile_number(node)
         elif isinstance(node, VarAssignNode):
             return self.__compile_var_assign(node)
+        elif isinstance(node, VarReAssignNode):
+            return self.__compile_var_reassign(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionNode):
@@ -84,11 +86,11 @@ class Compiler:
 
         if not self.builder.block.is_terminated:
             print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
-            if declared_return_type == self.type_map["void"]:
+            if return_type == self.type_map["void"]:
                 self.builder.ret_void()
                 print("[DEBUG] Returned void")
             else:
-                default_ret = ir.Constant(declared_return_type, 0)
+                default_ret = ir.Constant(return_type, 0)
                 self.builder.ret(default_ret)
                 print("[DEBUG] Returned default value 0")
 
@@ -204,6 +206,26 @@ class Compiler:
                 self.builder.store(value, ptr)
                 self.env.set_initialized(var_name)
 
+    def __compile_var_reassign(self, node):
+        var_name = node.var_name_tok.value
+
+        value, type = self.__resolve_value(node.value_node)
+
+        existing = self.env.lookup(var_name)
+
+        if not existing:
+            raise Exception(f"variable '{var_name}' is not declared before reassignment")
+        
+        ptr, existing_type, initialized = existing
+
+        if existing_type != type:
+            raise Exception(f"Type mismatch can not assign value of type {type} to variable '{var_name} of type {existing_type}'")
+        
+        self.builder.store(value, ptr)
+
+        self.env.set_initialized(var_name)
+
+        
     def __compile_var_access(self, node):
         var_name = node.var_name_tok.value
         entry = self.env.lookup(var_name)
