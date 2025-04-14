@@ -1,5 +1,10 @@
-fn asd():int {
-    var a =5;
-    a = 30;
-    return 69;
+fn ma(a : int, b : float) : int {
+    var a = 10;
+    var b = 10.1;
+    return a;
+
+}
+
+fn maz() : void {
+    var z = 10;
 }
