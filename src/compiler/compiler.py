@@ -84,11 +84,11 @@ class Compiler:
 
         if not self.builder.block.is_terminated:
             print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
-            if declared_return_type == self.type_map["void"]:
+            if return_type == self.type_map["void"]:
                 self.builder.ret_void()
                 print("[DEBUG] Returned void")
             else:
-                default_ret = ir.Constant(declared_return_type, 0)
+                default_ret = ir.Constant(return_type, 0)
                 self.builder.ret(default_ret)
                 print("[DEBUG] Returned default value 0")
 
@@ -106,11 +106,9 @@ class Compiler:
 
         if len(args) != len(func.args):
             raise Exception(f"Function '{func_name}' expects {len(func.args)} arguments, but {len(args)} were provided")
-   
-
-        self.builder.call(func, args)
-
-
+        
+        return_value = self.builder.call(func, args, name="call_tmp")
+        return return_value
 
     def __compile_block(self, node):
         for stmt in node.statements:
@@ -228,5 +226,10 @@ class Compiler:
             return self.__compile_bin_op(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
+        elif isinstance(node, FunctionCallNode):
+            result = self.__compile_function_call(node)
+            if result is None:
+                raise Exception(f"Function call '{node.func_name_tok.value}' did not return a value")
+            return result, self.type_map['int']
 
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")

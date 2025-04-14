@@ -4,3 +4,7 @@ fn ma(a : int, b : float) : int {
     return a;
 
 }
+
+fn maz() : void {
+    var z = 10;
+}
