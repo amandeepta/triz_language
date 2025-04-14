@@ -33,14 +33,17 @@ class Compiler:
             return self.__compile_function(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
+        elif isinstance(node, ReturnNode):
+            return self.__compile_return(node)
         else:
             raise Exception(f"Unknown node type: {type(node)}")
         
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
-        param_types = [self.type_map[param.type] for param in node.param_toks ]
+        param_types = [self.type_map.get('int', ir.IntType(32)) for param in node.param_toks]
         
-        fn_type = ir.FunctionType(self.type_map["void"], param_types)
+        return_type = self.type_map['int'] if any(isinstance(stmt, ReturnNode) for stmt in node.body_node.statements) else self.type_map['void']
+        fn_type = ir.FunctionType(return_type, param_types)
         func = ir.Function(self.module, fn_type, name=func_name)
 
         block = func.append_basic_block(f"{func_name}_entry")
@@ -72,19 +75,20 @@ class Compiler:
 
         if len(args) != len(func.args):
             raise Exception(f"Function '{func_name}' expects {len(func.args)} arguments, but {len(args)} were provided")
-   
-
-        self.builder.call(func, args)
-
-
+        
+        return_value = self.builder.call(func, args, name="call_tmp")
+        return return_value
 
     def __compile_block(self, node):
         for stmt in node.statements:
             self.compile(stmt)
 
     def __compile_return(self, node):
-        for stmt in node.statements:
-            self.compile(stmt)
+        if node.return_val:
+            return_value, _ = self.__resolve_value(node.return_val)
+            self.builder.ret(return_value)
+        else:
+            self.builder.ret_void()
 
     def __compile_program(self, node):
         func_name = "main"
@@ -191,5 +195,10 @@ class Compiler:
             return self.__compile_bin_op(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
+        elif isinstance(node, FunctionCallNode):
+            result = self.__compile_function_call(node)
+            if result is None:
+                raise Exception(f"Function call '{node.func_name_tok.value}' did not return a value")
+            return result, self.type_map['int']
 
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")

@@ -1,1 +1,14 @@
-var a=10;
+fn add(a, b) {
+    var result = a + b;
+    return result; 
+}
+
+fn get(){
+    return 6.9;
+}
+
+fn mi() {
+    var c = add(10, 5);
+    var k = get();
+    return 1;
+}
