@@ -91,6 +91,7 @@ class Parser:
 
 
         if (self.current_tok.type == TT_IDENTIFIER):
+            
             if (next_tok.type == TT_EQ):  # Check if next token is '='
                 self.advance()  # Advance to '='
                 self.advance()  # Advance to the value
@@ -263,7 +264,7 @@ class Parser:
                 return res
             body.append(stmt)
 
-            if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
 
@@ -337,6 +338,7 @@ class Parser:
                     self.current_tok.pos_end,
                     "Expected ')'"
                 ))
+        
         return res.failure(InvalidSyntaxError(
             tok.pos_start,
             tok.pos_end,
