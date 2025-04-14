@@ -21,7 +21,7 @@ class InvalidSyntaxError:
         self.pos_end = pos_end
         self.details = details
 
-    def as_string(self):
+    def __str__(self):
         return f"Invalid Syntax: {self.details} at position {self.pos_start}-{self.pos_end}"
 
 

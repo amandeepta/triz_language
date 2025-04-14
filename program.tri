@@ -1,1 +1,6 @@
-var a=10;
+fn ma(a : int, b : float) : int {
+    var a = 10;
+    var b = 10.1;
+    return a;
+
+}
