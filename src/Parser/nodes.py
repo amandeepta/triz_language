@@ -68,56 +68,33 @@ class VarAssignNode:
             "name": self.var_name_tok.value,
             "value": self.value_node.json()
         }
-
-
-class FunctionNode:
-    def __init__(self, func_name_tok, param_toks, body_node):
-        self.func_name_tok = func_name_tok
-        self.param_toks = param_toks
-        self.body_node = body_node
-
-        self.pos_start = self.func_name_tok.pos_start
-        self.pos_end = self.body_node.pos_end
+    
+class VarReAssignNode:
+    def __init__(self, var_name_tok, value_node):
+        self.var_name_tok = var_name_tok
+        self.value_node = value_node
+        self.value = value_node
+        self.pos_start = self.var_name_tok.pos_start
+        self.pos_end = value_node.pos_end if value_node else var_name_tok.pos_end
 
     def __repr__(self):
-        return f"FunctionNode({repr(self.func_name_tok)}, {repr(self.param_toks)}, {repr(self.body_node)})"
-    
-    def json(self):
-        return {
-            "type": "Function",
-            "name": self.func_name_tok.value,
-            "parameters": [param.value for param in self.param_toks],
-            "body": self.body_node.json(),
-        }
-    
-class FunctionCallNode:
-    def __init__(self, func_name_tok, arg_nodes):
-        self.func_name_tok = func_name_tok
-        self.arg_nodes = arg_nodes
-
-        self.pos_start = self.func_name_tok.pos_start
-        self.pos_end = self.arg_nodes[-1].pos_end if self.arg_nodes else self.func_name_tok.pos_end
-
-    
-    def __repr__(self):
-        return f"FunctionCallNode({repr(self.func_name_tok)}, {self.arg_nodes})"
+        return f'VarReAssignNode({repr(self.var_name_tok)}, {repr(self.value_node)})'
 
     def json(self):
         return {
-            "type": "FunctionCall", 
-            "name": self.func_name_tok.value,
-            "arguments": [arg.json() for arg in self.arg_nodes]
+            "type": "VarReAssign",
+            "name": self.var_name_tok.value,
+            "value": self.value_node.json()
         }
-
 
 
 class ReturnNode:
     def __init__(self, return_val_node):
         self.return_val = return_val_node
-        if return_val_node is None :
+        if return_val_node is None:
             self.pos_start = None
             self.pos_end = None
-        else :
+        else:
             self.pos_start = self.return_val.pos_start
             self.pos_end = self.return_val.pos_end
 
@@ -127,7 +104,7 @@ class ReturnNode:
     def json(self):
         return {
             "type": "Return",
-            "value": self.return_val.json(),
+            "value": self.return_val.json() if self.return_val else None,
         }
 
 
@@ -164,27 +141,48 @@ class ExpressionStatement:
 
 
 class FunctionNode:
-    def __init__(self, func_name_tok, param_toks, body_node):
+    def __init__(self, func_name_tok, param_toks,return_type, body_node):
         self.func_name_tok = func_name_tok
         self.param_toks = param_toks
         self.body_node = body_node
-
+        self.return_type = return_type
         self.pos_start = self.func_name_tok.pos_start
         self.pos_end = self.body_node.pos_end
 
     def __repr__(self):
-        return f"FunctionNode({repr(self.func_name_tok)}, {self.param_toks}, {repr(self.body_node)})"
+        return f"FunctionNode({repr(self.func_name_tok)}, {repr(self.param_toks)}, {repr(self.body_node)})"
 
     def json(self):
         return {
             "type": "FunctionStatement",
             "name": self.func_name_tok.value,
+            "return_type" : self.return_type,
             "parameters": [{
                 "type": "FunctionParameter",
                 "name": param.value,
-                "value_type": "int"  # Assuming it's always int for simplicity, adjust as needed
+                "value_type": param.type  # Assuming it's always int for simplicity, adjust as needed
             } for param in self.param_toks],
+            
             "body": self.body_node.json(),
+        }
+
+
+class FunctionCallNode:
+    def __init__(self, func_name_tok, arg_nodes):
+        self.func_name_tok = func_name_tok
+        self.arg_nodes = arg_nodes
+
+        self.pos_start = self.func_name_tok.pos_start
+        self.pos_end = self.arg_nodes[-1].pos_end if self.arg_nodes else self.func_name_tok.pos_end
+
+    def __repr__(self):
+        return f"FunctionCallNode({repr(self.func_name_tok)}, {repr(self.arg_nodes)})"
+
+    def json(self):
+        return {
+            "type": "FunctionCall",
+            "name": self.func_name_tok.value,
+            "arguments": [arg.json() for arg in self.arg_nodes]
         }
 
 
@@ -206,7 +204,7 @@ class ProgramNode:
         self.pos_end = stmt.pos_end
 
     def __repr__(self):
-        return f"(Program: {self.statements})"
+        return f"(Program: {repr(self.statements)})"
 
     def json(self):
         return {
@@ -214,7 +212,7 @@ class ProgramNode:
             "statements": [stmt.json() for stmt in self.statements]
         }
 
-    
+
 class BlockNode:
     def __init__(self, statements):
         self.statements = statements or []
@@ -227,7 +225,7 @@ class BlockNode:
             self.pos_end = None
 
     def __repr__(self):
-        return f'BlockNode({self.statements})'
+        return f'BlockNode({repr(self.statements)})'
 
     def json(self):
         return {

@@ -47,6 +47,11 @@ class Parser:
 
     def __is_at_end(self):
         return self.tok_idx >= len(self.tokens)
+    
+    def peek(self):
+        if self.tok_idx + 1 < len(self.tokens):
+            return self.tokens[self.tok_idx +1]
+        return None
 
     def advance(self):
         self.tok_idx += 1
@@ -67,10 +72,9 @@ class Parser:
                 return res
             program_node.statements.append(stmt)
 
-            if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
+            if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
-                # Allow optional semicolon
                 elif self.current_tok.type != TT_EOF and self.current_tok.type != TT_RBRACE:
                     return res.failure(InvalidSyntaxError(
                         getattr(self.current_tok, 'pos_start', None),
@@ -82,7 +86,22 @@ class Parser:
 
     def statement(self):
         res = ParseResult()
+        var_name = self.current_tok
+        next_tok = self.peek()
 
+
+        if (self.current_tok.type == TT_IDENTIFIER):
+            if (next_tok.type == TT_EQ):  # Check if next token is '='
+                self.advance()  # Advance to '='
+                self.advance()  # Advance to the value
+                value = res.register(self.expr())  # Parse the expression
+                if res.error:
+                    return res
+                return res.success(VarReAssignNode(var_name, value)) 
+            
+            else:
+                pass
+            
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
 
@@ -160,7 +179,7 @@ class Parser:
 
     def func_def(self):
         res = ParseResult()
-        self.advance()
+        self.advance()  # Skip FN keyword
         if self.current_tok.type != TT_IDENTIFIER:
             return res.failure(InvalidSyntaxError(
                 self.current_tok.pos_start,
@@ -179,18 +198,29 @@ class Parser:
         self.advance()
 
         param_toks = []
-        if self.current_tok.type == TT_IDENTIFIER:
-            param_toks.append(self.current_tok)
+        while self.current_tok.type == TT_IDENTIFIER:
+            param_name = self.current_tok
             self.advance()
-            while self.current_tok.type == TT_COMMA:
-                self.advance()
-                if self.current_tok.type != TT_IDENTIFIER:
-                    return res.failure(InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        "Expected identifier for parameter"
-                    ))
-                param_toks.append(self.current_tok)
+            if self.current_tok.type != TT_COLON:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ':' after parameter name"
+                ))
+            self.advance()
+
+            if self.current_tok.type not in TT_TYPE:
+                
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected parameter type (INT or FLOAT)"
+                ))
+            param_type = self.current_tok
+            param_toks.append((param_name, param_type))
+            self.advance()
+
+            if self.current_tok.type == TT_COMMA:
                 self.advance()
 
         if self.current_tok.type != TT_RPAREN:
@@ -199,6 +229,23 @@ class Parser:
                 self.current_tok.pos_end,
                 "Expected closing parenthesis ')'"
             ))
+        self.advance()
+
+        if self.current_tok.type != TT_COLON:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected ':' after function parameters"
+            ))
+        self.advance()
+
+        if self.current_tok.type not in TT_TYPE:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected return type (INT or FLOAT)"
+            ))
+        return_type = self.current_tok
         self.advance()
 
         if self.current_tok.type != TT_LBRACE:
@@ -215,13 +262,12 @@ class Parser:
             if res.error:
                 return res
             body.append(stmt)
-            
+
             if isinstance(stmt, (ExpressionStatement, VarAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
 
         if self.current_tok.type != TT_RBRACE:
-            
             return res.failure(InvalidSyntaxError(
                 self.current_tok.pos_start,
                 self.current_tok.pos_end,
@@ -230,7 +276,7 @@ class Parser:
         self.advance()
 
         block_node = BlockNode(body)
-        return res.success(FunctionNode(func_name, param_toks, block_node))
+        return res.success(FunctionNode(func_name, param_toks, return_type, block_node))
 
     def atom(self):
         res = ParseResult()
@@ -249,7 +295,7 @@ class Parser:
         elif tok.type == TT_IDENTIFIER:
             self.advance()
             
-            #check for fncn calls
+            # Check for function calls
             if self.current_tok.type == TT_LPAREN:
                 self.advance()
                 arg_nodes = []

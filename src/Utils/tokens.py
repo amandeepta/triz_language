@@ -6,6 +6,7 @@ TT_FLOAT = 'FLOAT'
 TT_PLUS = 'PLUS'
 TT_IDENTIFIER = 'IDENTIFIER'
 TT_KEYWORD = 'KEYWORD'
+TT_TYPE = 'TYPE'
 TT_MINUS = 'MINUS'
 TT_MUL = 'MUL'
 TT_DIV = 'DIV'
@@ -23,14 +24,17 @@ TT_LT = 'LT'
 TT_GTE = 'GTE'
 TT_LTE = 'LTE'
 TT_COMMA = 'COMMA'
+TT_COLON = 'COLON'  # Added colon for function parameter types
 TT_EOF = 'EOF'
 
+TT_TYPES = [
+    'INT',
+    'FLOAT'
+]
 # Keywords
 KEYWORDS = [
     'VAR', 
     'CONST',
-    'INT',
-    'FLOAT',
     'AND',
     'OR',
     'NOT',

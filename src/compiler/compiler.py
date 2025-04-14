@@ -12,7 +12,10 @@ class Compiler:
             'float': ir.FloatType(),
             'double': ir.DoubleType(),
             'bool': ir.IntType(1),
-            'void': ir.VoidType()
+            'void': ir.VoidType(),
+            "INT": ir.IntType(32),
+            "FLOAT": ir.FloatType(),
+            "VOID": ir.VoidType()
         }
         self.env = Environment()
 
@@ -27,42 +30,72 @@ class Compiler:
             return self.__compile_number(node)
         elif isinstance(node, VarAssignNode):
             return self.__compile_var_assign(node)
+        elif isinstance(node, VarReAssignNode):
+            return self.__compile_var_reassign(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionNode):
             return self.__compile_function(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
-        elif isinstance(node, ReturnNode):
-            return self.__compile_return(node)
+        elif isinstance(node, ReturnNode):  # Handle ReturnNode
+            self.__compile_return(node)
         else:
             raise Exception(f"Unknown node type: {type(node)}")
         
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
-        param_types = [self.type_map.get('int', ir.IntType(32)) for param in node.param_toks]
-        
-        return_type = self.type_map['int'] if any(isinstance(stmt, ReturnNode) for stmt in node.body_node.statements) else self.type_map['void']
+        print(f"Compiling function: {func_name}")
+
+        param_types = [self.type_map[param_type_tok.value] for (_, param_type_tok) in node.param_toks]
+        print(f"[DEBUG] Parameter types for function '{func_name}': {param_types}")
+
+
+        print(type(node.return_type))
+        return_type = self.type_map[node.return_type.value]
+
+        print(f"Function return type: {return_type}")
+
         fn_type = ir.FunctionType(return_type, param_types)
+
         func = ir.Function(self.module, fn_type, name=func_name)
+        print(f"LLVM Function created: {func}")
 
         block = func.append_basic_block(f"{func_name}_entry")
         self.builder = ir.IRBuilder(block)
+
         self.env = Environment(parent=self.env)
 
-        for i, param_tok in enumerate(node.param_toks):
-            param_name = param_tok.value
-            ptr = self.builder.alloca(param_types[i], name=param_name)
+        for i, (param_name_tok, param_type_tok) in enumerate(node.param_toks):
+            llvm_type = self.type_map[param_type_tok.value]
+            ptr = self.builder.alloca(llvm_type, name=param_name_tok.value)
             self.builder.store(func.args[i], ptr)
-            self.env.define(param_name, ptr, param_types[i], initialized=True)
+            self.env.define(param_name_tok.value, ptr, llvm_type, initialized=True)
+            print(f"[DEBUG] Allocated variable '{param_name_tok.value}' of type {llvm_type}")
 
         for stmt in node.body_node.statements:
+            print(f"[DEBUG] Compiling statement: {stmt}")
+            if isinstance(stmt, ReturnNode):
+                print("[DEBUG] Found return statement")
+                return_value, inferred_type = self.__resolve_value(stmt.return_val)
+                print(f"[DEBUG] Inferred return type: {inferred_type}, Expected: {return_type}")
+                if inferred_type != return_type:
+                    raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
+            
             self.compile(stmt)
 
         if not self.builder.block.is_terminated:
-            self.builder.ret_void()
+            print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
+            if return_type == self.type_map["void"]:
+                self.builder.ret_void()
+                print("[DEBUG] Returned void")
+            else:
+                default_ret = ir.Constant(return_type, 0)
+                self.builder.ret(default_ret)
+                print("[DEBUG] Returned default value 0")
 
         self.env = self.env.parent
+        print(f"[INFO] Function '{func_name}' compiled successfully\n")
 
     def __compile_function_call(self, node):
         func_name = node.func_name_tok.value
@@ -75,20 +108,22 @@ class Compiler:
 
         if len(args) != len(func.args):
             raise Exception(f"Function '{func_name}' expects {len(func.args)} arguments, but {len(args)} were provided")
-        
-        return_value = self.builder.call(func, args, name="call_tmp")
-        return return_value
+   
+
+        self.builder.call(func, args)
+
+
 
     def __compile_block(self, node):
         for stmt in node.statements:
             self.compile(stmt)
 
     def __compile_return(self, node):
-        if node.return_val:
-            return_value, _ = self.__resolve_value(node.return_val)
-            self.builder.ret(return_value)
-        else:
-            self.builder.ret_void()
+        return_value, _ = self.__resolve_value(node.return_val)  # Resolve return value
+
+        # Add return instruction to the builder
+        self.builder.ret(return_value)
+
 
     def __compile_program(self, node):
         func_name = "main"
@@ -171,6 +206,26 @@ class Compiler:
                 self.builder.store(value, ptr)
                 self.env.set_initialized(var_name)
 
+    def __compile_var_reassign(self, node):
+        var_name = node.var_name_tok.value
+
+        value, type = self.__resolve_value(node.value_node)
+
+        existing = self.env.lookup(var_name)
+
+        if not existing:
+            raise Exception(f"variable '{var_name}' is not declared before reassignment")
+        
+        ptr, existing_type, initialized = existing
+
+        if existing_type != type:
+            raise Exception(f"Type mismatch can not assign value of type {type} to variable '{var_name} of type {existing_type}'")
+        
+        self.builder.store(value, ptr)
+
+        self.env.set_initialized(var_name)
+
+        
     def __compile_var_access(self, node):
         var_name = node.var_name_tok.value
         entry = self.env.lookup(var_name)
@@ -195,10 +250,5 @@ class Compiler:
             return self.__compile_bin_op(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
-        elif isinstance(node, FunctionCallNode):
-            result = self.__compile_function_call(node)
-            if result is None:
-                raise Exception(f"Function call '{node.func_name_tok.value}' did not return a value")
-            return result, self.type_map['int']
 
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")
