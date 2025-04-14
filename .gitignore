@@ -1,0 +1,10 @@
+# Ignore all __pycache__ directories recursively
+**/__pycache__/
+
+# Ignore Python cache files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore the .gitignore file itself
+.gitignore
