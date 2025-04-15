@@ -150,42 +150,62 @@ class Compiler:
 
         self.env = self.env.parent
         
-    def __compile_print(self, node):
-        value, typ = self.__resolve_value(node.expr_node)
-
+    def __compile_print(self, node: PrintNode):
         printf = self.module.globals.get('printf')
         if printf is None:
             voidptr_ty = ir.IntType(8).as_pointer()
             printf_ty = ir.FunctionType(ir.IntType(32), [voidptr_ty], var_arg=True)
             printf = ir.Function(self.module, printf_ty, name="printf")
 
-        fmt_str = None
+        format_parts = []
+        args = []
 
-        if typ == self.type_map["string"]:
-            fmt_str = "%s\n\0"
-            args = [value]
-        elif typ == self.type_map["int"]:
-            fmt_str = "%d\n\0"
-            args = [value]
-        elif typ == self.type_map["float"]:
-            fmt_str = "%f\n\0"
-            args = [value]
-        elif typ == self.type_map["bool"]:
-            int_val = self.builder.zext(value, ir.IntType(32))
-            fmt_str = "%d\n\0"
-            args = [int_val]
-        else:
-            raise Exception(f"Print does not support type: {typ}")
+        for expr in node.expr_nodes:
+            value, typ = self.__resolve_value(expr)
+
+            if typ == self.type_map["string"]:
+                format_parts.append("%s")
+                if isinstance(value.type, ir.PointerType) and isinstance(value.type.pointee, ir.PointerType):
+                    loaded = self.builder.load(value)
+                    casted = self.builder.bitcast(loaded, ir.IntType(8).as_pointer())
+                    args.append(casted)
+                else:
+                    casted = self.builder.bitcast(value, ir.IntType(8).as_pointer())
+                    args.append(casted)
+
+            elif typ == self.type_map["int"]:
+                format_parts.append("%d")
+                args.append(value)
+
+            elif typ == self.type_map["float"]:
+                format_parts.append("%f")
+                args.append(value)
+
+            elif typ == self.type_map["bool"]:
+                format_parts.append("%d")
+                casted = self.builder.zext(value, ir.IntType(32))
+                args.append(casted)
+
+            else:
+                raise Exception(f"Print does not support type: {typ}")
+
+        fmt_str = " ".join(format_parts) + "\n\0"
+        fmt_name = f"print_fmt_{len(format_parts)}"
 
         fmt_bytes = bytearray(fmt_str.encode("utf8"))
         const_fmt = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_bytes)), fmt_bytes)
-        global_fmt = ir.GlobalVariable(self.module, const_fmt.type, name=f"print_fmt_{typ}")
-        global_fmt.linkage = 'internal'
-        global_fmt.global_constant = True
-        global_fmt.initializer = const_fmt
+
+        if fmt_name not in self.module.globals:
+            global_fmt = ir.GlobalVariable(self.module, const_fmt.type, name=fmt_name)
+            global_fmt.linkage = 'internal'
+            global_fmt.global_constant = True
+            global_fmt.initializer = const_fmt
+        else:
+            global_fmt = self.module.get_global(fmt_name)
 
         fmt_ptr = self.builder.bitcast(global_fmt, ir.IntType(8).as_pointer())
         self.builder.call(printf, [fmt_ptr] + args)
+
 
 
 

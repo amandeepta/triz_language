@@ -291,18 +291,22 @@ class IfNode:
         }
 
 class PrintNode:
-    def __init__(self, expr_node):
-        self.expr_node = expr_node
-        self.pos_start = self.expr_node.pos_start
-        self.pos_end = self.expr_node.pos_end
+    def __init__(self, expr_nodes):
+        # expr_nodes is now a list of expression nodes
+        self.expr_nodes = expr_nodes
+        # The position information should be derived from the first and last expressions
+        self.pos_start = self.expr_nodes[0].pos_start
+        self.pos_end = self.expr_nodes[-1].pos_end
 
     def __repr__(self):
-        return f'PrintNode({repr(self.expr_node)})'
+        # Update repr to represent multiple expressions
+        return f'PrintNode({repr(self.expr_nodes)})'
 
     def json(self):
+        # Update json method to output the list of expressions
         return {
             "type": "PrintStatement",
-            "expr": self.expr_node.json()
+            "exprs": [expr_node.json() for expr_node in self.expr_nodes]
         }
 
 class WhileNode:

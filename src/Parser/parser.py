@@ -151,11 +151,47 @@ class Parser:
         if self.current_tok.matches(TT_KEYWORD, "PRINT"):
             self.advance()
 
-            # Ensure that there is an expression to print
-            expr = res.register(self.expr())
-            if res.error:
-                return res
+            # Ensure there's a '(' after PRINT keyword
+            if self.current_tok.type != TT_LPAREN:
+                return res.failure(InvalidSyntaxError(
+                    getattr(self.current_tok, 'pos_start', None),
+                    getattr(self.current_tok, 'pos_end', None),
+                    "Expected '(' after 'PRINT'"
+                ))
+            self.advance()
+            
+            # Collect arguments inside the parentheses
+            args = []
+            while self.current_tok.type != TT_RPAREN:
+                # Parse the expression for each argument
+                expr = res.register(self.expr())
+                if res.error:
+                    return res
 
+                args.append(expr)
+                
+                # Check for a comma separating arguments
+                if self.current_tok.type == TT_COMMA:
+                    self.advance()
+                    continue
+                # If we encounter a closing parenthesis or anything else, stop
+                if self.current_tok.type == TT_RPAREN:
+                    break
+                else:
+                    return res.failure(InvalidSyntaxError(
+                        getattr(self.current_tok, 'pos_start', None),
+                        getattr(self.current_tok, 'pos_end', None),
+                        "Expected ',' or ')' after argument"
+                    ))
+
+            # Ensure the closing parenthesis
+            if self.current_tok.type != TT_RPAREN:
+                return res.failure(InvalidSyntaxError(
+                    getattr(self.current_tok, 'pos_start', None),
+                    getattr(self.current_tok, 'pos_end', None),
+                    "Expected ')' after arguments"
+                ))
+            self.advance()
             if self.current_tok.type != TT_SEMI:
                 return res.failure(InvalidSyntaxError(
                     getattr(self.current_tok, 'pos_start', None),
@@ -163,9 +199,9 @@ class Parser:
                     "Expected ';' after print statement"
                 ))
             self.advance()
+            # Return the PrintNode with arguments
+            return res.success(PrintNode(args))
 
-            # Return the PrintNode
-            return res.success(PrintNode(expr))
 
         # Handle variable assignment or reassignment
         if self.current_tok.type == TT_IDENTIFIER:

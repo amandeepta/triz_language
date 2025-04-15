@@ -1,9 +1,8 @@
-fn riz() : int {
-    var a = 0;
-
-    while (a < 10){
-        a = a+1;
+fn ma() :str {
+    var i;
+    i = 0;
+    while (i < 10) {
+        print(i);
     }
-
-    return 1;
+    return "hello";
 }
