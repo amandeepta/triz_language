@@ -68,6 +68,9 @@ class RegexLexer:
                 if upper_value in KEYWORDS:
                     tok_type = TT_KEYWORD
                     value = upper_value
+                elif upper_value in ("TRUE", "FALSE"):
+                    tok_type = TT_BOOL
+                    value = True if upper_value=="TRUE" else False
                 elif upper_value in TT_TYPES:
                     tok_type = TT_TYPE
                     value = upper_value
@@ -76,6 +79,8 @@ class RegexLexer:
                 value = int(value)
             elif tok_type == TT_FLOAT:
                 value = float(value)
+            elif tok_type == TT_BOOL:
+                value = True if value.upper == "TRUE" else False
             elif tok_type == TT_STR:
                 value = bytes(value[1:-1], "utf-8").decode("unicode_escape")  # unescape strings
 

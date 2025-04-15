@@ -48,11 +48,44 @@ class Compiler:
 
             elif isinstance(node, ReturnNode):
                 self.__compile_return(node)
+            elif isinstance(node, IfNode):
+                self.__compile_if(node)
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
+        
+    def __compile_if(self, node):
+        condition_value, condition_type = self.__resolve_value(node.condition_node)
+
+        if condition_type != self.type_map["bool"]:
+            raise Exception("Condition in 'if' statement must be of tyoe bool")
+        
+        then_block = self.builder.append_basic_block("if_then")
+        else_block = self.builder.append_basic_block("if_else") if node.else_node else None
+        merge_block = self.builder.append_basic_block("if_merge")
+
+        if else_block:
+            self.builder.cbranch(condition_value, then_block, else_block)
+        else:
+            self.builder.cbranch(condition_value, then_block, merge_block)
+
+        self.builder.position_at_end(then_block)
+        self.__compile_block(node.then_node)
+        if not self.builder.block.is_terminated:
+            self.builder.branch(merge_block)
+
+        if else_block:
+            self.builder.position_at_end(else_block)
+            self.__compile_block(node.else_node)
+            if not self.builder.block.is_terminated:
+                self.builder.branch(merge_block)
+
+        self.builder.position_at_end(merge_block)
+
+
+    
 
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
@@ -193,6 +226,18 @@ class Compiler:
             return self.builder.sdiv(left_value, right_value), self.type_map["int"]
         elif node.op_tok.type == TT_MOD:
             return self.builder.srem(left_value, right_value), self.type_map["int"]
+        elif node.op_tok.type == TT_GT:
+            return self.builder.icmp_signed('>', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_LT:
+            return self.builder.icmp_signed('<', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_EE:
+            return self.builder.icmp_signed('==', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_NE:
+            return self.builder.icmp_signed('!=', left_value, right_value), self.type_map["bool"]
+        elif op == '>=':
+            return self.builder.icmp_signed('>=', left_value, right_value), self.type_map["bool"]
+        elif op == '<=':
+            return self.builder.icmp_signed('<=', left_value, right_value), self.type_map["bool"]
 
         raise Exception(f"Unsupported binary operation: {node.op_tok.value}")
 
@@ -282,6 +327,9 @@ class Compiler:
                 return ir.Constant(self.type_map["int"], val), self.type_map["int"]
             elif isinstance(val, float):
                 return ir.Constant(self.type_map["float"], val), self.type_map["float"]
+        elif isinstance(node, BooleanNode):
+            val = node.tok.value
+            return ir.Constant(self.type_map["bool"], 1 if val else 0), self.type_map["bool"]
         elif isinstance(node, BinOpNode):
             return self.__compile_bin_op(node)
         elif isinstance(node, StringNode):
