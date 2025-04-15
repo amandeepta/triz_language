@@ -26,11 +26,13 @@ TT_LTE = 'LTE'
 TT_COMMA = 'COMMA'
 TT_COLON = 'COLON'  # Added colon for function parameter types
 TT_EOF = 'EOF'
+TT_STR = 'STRING'
 
 TT_TYPES = [
     'INT',
     'FLOAT',
-    'VOID'
+    'VOID',
+    'STR'
 ]
 # Keywords
 KEYWORDS = [
@@ -41,6 +43,7 @@ KEYWORDS = [
     'NOT',
     'FN',
     'RETURN', 
+    'PRINT'
 ]
 
 # Token class

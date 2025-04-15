@@ -166,6 +166,22 @@ class FunctionNode:
             "body": self.body_node.json(),
         }
 
+class StringNode:
+    def __init__(self, tok):
+        self.token = tok
+        self.pos_start = tok.pos_start
+        self.pos_end = tok.pos_end
+        self.type = "StringLiteral"
+
+    def __repr__(self):
+        return f'StringNode("{self.token.value}")'
+
+    def json(self):
+        return {
+            "type": self.type,
+            "value": self.token.value
+        }
+
 
 class FunctionCallNode:
     def __init__(self, func_name_tok, arg_nodes):
@@ -231,4 +247,19 @@ class BlockNode:
         return {
             "type": "Block",
             "statements": [stmt.json() for stmt in self.statements]
+        }
+
+class PrintNode:
+    def __init__(self, expr_node):
+        self.expr_node = expr_node
+        self.pos_start = self.expr_node.pos_start
+        self.pos_end = self.expr_node.pos_end
+
+    def __repr__(self):
+        return f'PrintNode({repr(self.expr_node)})'
+
+    def json(self):
+        return {
+            "type": "PrintStatement",
+            "expr": self.expr_node.json()
         }
