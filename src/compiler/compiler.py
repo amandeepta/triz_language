@@ -49,20 +49,14 @@ class Compiler:
 
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
-        print(f"Compiling function: {func_name}")
 
         param_types = [self.type_map[param_type_tok.value] for (_, param_type_tok) in node.param_toks]
-        print(f"[DEBUG] Parameter types for function '{func_name}': {param_types}")
-
-        print(type(node.return_type))
         return_type = self.type_map[node.return_type.value]
-        print(f"Function return type: {return_type}")
 
         # Check if function return type is void
         fn_type = ir.FunctionType(return_type, param_types)
 
         func = ir.Function(self.module, fn_type, name=func_name)
-        print(f"LLVM Function created: {func}")
 
         block = func.append_basic_block(f"{func_name}_entry")
         self.builder = ir.IRBuilder(block)
@@ -74,33 +68,24 @@ class Compiler:
             ptr = self.builder.alloca(llvm_type, name=param_name_tok.value)
             self.builder.store(func.args[i], ptr)
             self.env.define(param_name_tok.value, ptr, llvm_type, initialized=True)
-            print(f"[DEBUG] Allocated variable '{param_name_tok.value}' of type {llvm_type}")
 
         for stmt in node.body_node.statements:
-            print(f"[DEBUG] Compiling statement: {stmt}")
             if isinstance(stmt, ReturnNode):
-                print("[DEBUG] Found return statement")
                 return_value, inferred_type = self.__resolve_value(stmt.return_val)
-                print(f"[DEBUG] Inferred return type: {inferred_type}, Expected: {return_type}")
                 if inferred_type != return_type:
                     raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
                 self.builder.ret(return_value)  # emit return here itself
                 continue
             self.compile(stmt)
 
-        # Ensure the function returns correctly
         if not self.builder.block.is_terminated:
-            print(f"[DEBUG] Function '{func_name}' not explicitly terminated")
             if return_type == self.type_map["void"]:
                 self.builder.ret_void()
-                print("[DEBUG] Returned void")
             else:
                 default_ret = ir.Constant(return_type, 0)
                 self.builder.ret(default_ret)
-                print("[DEBUG] Returned default value 0")
 
         self.env = self.env.parent
-        print(f"[INFO] Function '{func_name}' compiled successfully\n")
 
     def __compile_function_call(self, node):
         func_name = node.func_name_tok.value
@@ -116,7 +101,6 @@ class Compiler:
 
         call_result = self.builder.call(func, args)
 
-        # Infer return type from function type
         return_type = func.function_type.return_type
 
         return call_result, return_type
@@ -126,9 +110,8 @@ class Compiler:
             self.compile(stmt)
 
     def __compile_return(self, node):
-        return_value, _ = self.__resolve_value(node.return_val)  # Resolve return value
+        return_value, _ = self.__resolve_value(node.return_val)
 
-        # Add return instruction to the builder
         self.builder.ret(return_value)
 
     def __compile_program(self, node):
@@ -146,7 +129,6 @@ class Compiler:
             self.compile(stmt)
 
         return_value = ir.Constant(self.type_map["int"], 0)
-        # Ensure the block is not already terminated before adding a return
         if not self.builder.block.is_terminated:
             self.builder.ret(return_value)
 
@@ -189,7 +171,6 @@ class Compiler:
         var_name = node.var_name_tok.value
 
         if node.value_node is None:
-            # Default to int if no value provided
             ptr = self.builder.alloca(self.type_map["int"])
             self.env.define(var_name, ptr, self.type_map["int"], initialized=False)
         else:
@@ -197,7 +178,6 @@ class Compiler:
 
             existing = self.env.lookup(var_name)
             if existing is None:
-                # Type inferred from value
                 ptr = self.builder.alloca(typ)
                 self.builder.store(value, ptr)
                 self.env.define(var_name, ptr, typ, initialized=True)

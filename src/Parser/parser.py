@@ -26,17 +26,21 @@ class ParseResult:
 
     def success(self, node):
         self.node = node
+        self.pos_start = node.pos_start if node else None
+        self.pos_end = node.pos_end if node else None
         return self
 
     def failure(self, error):
         self.error = error
+        self.pos_start = error.pos_start
+        self.pos_end = error.pos_end
         return self
 
     def set_pos(self, token):
-        # Helper method to pass position info from token
         if token:
             self.pos_start = token.pos_start
             self.pos_end = token.pos_end
+
 
 class Parser:
     def __init__(self, tokens):
@@ -47,10 +51,10 @@ class Parser:
 
     def __is_at_end(self):
         return self.tok_idx >= len(self.tokens)
-    
+
     def peek(self):
         if self.tok_idx + 1 < len(self.tokens):
-            return self.tokens[self.tok_idx +1]
+            return self.tokens[self.tok_idx + 1]
         return None
 
     def advance(self):
@@ -89,24 +93,21 @@ class Parser:
         var_name = self.current_tok
         next_tok = self.peek()
 
-        print(f"{var_name}, {next_tok}")
-
-
-        if (self.current_tok.type == TT_IDENTIFIER):
-            
-            if (next_tok.type == TT_EQ):  # Check if next token is '='
-                print(f"= found")
-                self.advance()  # Advance to '='
-                self.advance()  # Advance to the value
-                value = res.register(self.expr())  # Parse the expression
-                print(f"p to {value}")
+        if self.current_tok.type == TT_IDENTIFIER:
+            if next_tok and next_tok.type == TT_EQ:
+                self.advance()
+                self.advance()
+                value = res.register(self.expr())
                 if res.error:
-                    return res
-                return res.success(VarReAssignNode(var_name, value)) 
-            
-            else:
-                print(f"= not found")
-                pass
+                    return res.failure(res.error)
+                if self.current_tok.type != TT_SEMI:
+                    return res.failure(InvalidSyntaxError(
+                        getattr(self.current_tok, 'pos_start', None),
+                        getattr(self.current_tok, 'pos_end', None),
+                        "Expected ';' after assignment"
+                    ))
+                self.advance()
+                return res.success(VarReAssignNode(var_name, value))
 
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
@@ -134,7 +135,15 @@ class Parser:
         return_value = res.register(self.expr())
         if res.error:
             return res
-        
+
+        if self.current_tok.type != TT_SEMI:
+            return res.failure(InvalidSyntaxError(
+                getattr(self.current_tok, 'pos_start', None),
+                getattr(self.current_tok, 'pos_end', None),
+                "Expected ';' after return statement"
+            ))
+        self.advance()
+
         return res.success(ReturnNode(return_value))
 
     def expr(self):
@@ -150,8 +159,10 @@ class Parser:
                 ))
             var_name = self.current_tok
             self.advance()
-            if self.current_tok.type is TT_SEMI :
+
+            if self.current_tok.type == TT_SEMI:
                 return res.success(VarAssignNode(var_name, None))
+
             if self.current_tok.type != TT_EQ:
                 return res.failure(InvalidSyntaxError(
                     self.current_tok.pos_start,
@@ -163,6 +174,13 @@ class Parser:
             value = res.register(self.expr())
             if res.error:
                 return res
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    getattr(self.current_tok, 'pos_start', None),
+                    getattr(self.current_tok, 'pos_end', None),
+                    "Expected ';' after variable assignment"
+                ))
+            self.advance()
             return res.success(VarAssignNode(var_name, value))
 
         return self.bin_op(self.atom, 0)
@@ -186,7 +204,8 @@ class Parser:
 
     def func_def(self):
         res = ParseResult()
-        self.advance()  # Skip FN keyword
+        self.advance()
+
         if self.current_tok.type != TT_IDENTIFIER:
             return res.failure(InvalidSyntaxError(
                 self.current_tok.pos_start,
@@ -217,7 +236,6 @@ class Parser:
             self.advance()
 
             if self.current_tok.type not in TT_TYPE:
-                
                 return res.failure(InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
@@ -234,7 +252,7 @@ class Parser:
             return res.failure(InvalidSyntaxError(
                 self.current_tok.pos_start,
                 self.current_tok.pos_end,
-                "Expected closing parenthesis ')'"
+                "Expected closing parenthesis ')' for function parameters"
             ))
         self.advance()
 
@@ -270,7 +288,6 @@ class Parser:
                 return res
             body.append(stmt)
 
-            
             if isinstance(stmt, (ExpressionStatement, VarAssignNode, VarReAssignNode, ReturnNode)):
                 if self.current_tok.type == TT_SEMI:
                     self.advance()
@@ -302,8 +319,7 @@ class Parser:
             return res.success(NumberNode(tok))
         elif tok.type == TT_IDENTIFIER:
             self.advance()
-            
-            # Check for function calls
+
             if self.current_tok.type == TT_LPAREN:
                 self.advance()
                 arg_nodes = []
@@ -312,42 +328,42 @@ class Parser:
                     arg_nodes.append(res.register(self.expr()))
                     if res.error:
                         return res
-                    
+
                     while self.current_tok.type == TT_COMMA:
                         self.advance()
                         arg_nodes.append(res.register(self.expr()))
                         if res.error:
                             return res
-                        
-                    if self.current_tok.type != TT_RPAREN:
-                        return res.failure(InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            "Expected a closing parenthesis ')'"
-                        ))
-                    
+
+                if self.current_tok.type != TT_RPAREN:
+                    return res.failure(InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected closing parenthesis ')'"
+                    ))
+
                 self.advance()
+
                 return res.success(FunctionCallNode(tok, arg_nodes))
-                
+
             return res.success(VarAccessNode(tok))
-        
+
         elif tok.type == TT_LPAREN:
             self.advance()
             expr = res.register(self.expr())
             if res.error:
                 return res
-            if self.current_tok.type == TT_RPAREN:
-                self.advance()
-                return res.success(expr)
-            else:
+            if self.current_tok.type != TT_RPAREN:
                 return res.failure(InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    "Expected ')'"
+                    "Expected closing parenthesis ')'"
                 ))
-        
+            self.advance()
+            return res.success(expr)
+
         return res.failure(InvalidSyntaxError(
             tok.pos_start,
             tok.pos_end,
-            "Expected int, float, '+', '-', identifier, or '('"
+            "Expected an expression"
         ))
