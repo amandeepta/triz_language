@@ -188,6 +188,18 @@ class Compiler:
             return self.builder.sdiv(left_value, right_value), self.type_map["int"]
         elif node.op_tok.type == TT_MOD:
             return self.builder.srem(left_value, right_value), self.type_map["int"]
+        elif node.op_tok.type == TT_GT:
+            return self.builder.icmp_signed('>', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_LT:
+            return self.builder.icmp_signed('<', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_EE:
+            return self.builder.icmp_signed('==', left_value, right_value), self.type_map["bool"]
+        elif node.op_tok.type == TT_NE:
+            return self.builder.icmp_signed('!=', left_value, right_value), self.type_map["bool"]
+        elif op == '>=':
+            return self.builder.icmp_signed('>=', left_value, right_value), self.type_map["bool"]
+        elif op == '<=':
+            return self.builder.icmp_signed('<=', left_value, right_value), self.type_map["bool"]
 
         raise Exception(f"Unsupported binary operation: {node.op_tok.value}")
 
@@ -262,6 +274,9 @@ class Compiler:
                 return ir.Constant(self.type_map["int"], val), self.type_map["int"]
             elif isinstance(val, float):
                 return ir.Constant(self.type_map["float"], val), self.type_map["float"]
+        elif isinstance(node, BooleanNode):
+            val = node.tok.value
+            return ir.Constant(self.type_map["bool"], 1 if val else 0), self.type_map["bool"]
         elif isinstance(node, BinOpNode):
             return self.__compile_bin_op(node)
         elif isinstance(node, VarAccessNode):

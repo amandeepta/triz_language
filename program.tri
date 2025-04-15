@@ -1,9 +1,10 @@
 fn riz() : int {
-    var a=20;
-    if ( 10 >20 ){
-        a = 35;
+    var b=20;
+    var a = 35;
+    if ( a > b ){
+        a=20;
     }
-    return 20;
+    return b;
 
 
 }

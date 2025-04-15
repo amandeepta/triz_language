@@ -321,6 +321,7 @@ class Parser:
         return self.bin_op(self.factor, 2)
 
     def factor(self):
+        print(f"debug:  enter factor for {self.current_tok}")
         res = ParseResult()
         tok = self.current_tok
 
@@ -337,6 +338,19 @@ class Parser:
         elif tok.type in (TT_INT, TT_FLOAT):
             self.advance()
             return res.success(NumberNode(tok))
+        
+        elif tok.matches(TT_KEYWORD, "TRUE"):
+            self.advance()
+            return res.success(BooleanNode(tok))
+        elif tok.matches(TT_KEYWORD, "FALSE"):
+            self.advance()
+            return res.success(BooleanNode(tok))
+        elif tok.matches(TT_KEYWORD, "NOT"):
+            self.advance()
+            expr = res.register(self.atom())
+            if res.error:
+                return res
+            return res.success(UnaryOpNode(tok, expr))
         
         # Handle variables (identifiers)
         elif tok.type == TT_IDENTIFIER:
@@ -498,6 +512,18 @@ class Parser:
         elif tok.type in (TT_INT, TT_FLOAT):
             self.advance()
             return res.success(NumberNode(tok))
+        elif tok.matches(TT_KEYWORD, "TRUE" ):
+            self.advance()
+            return res.success(BooleanNode(True))
+        elif tok.matches(TT_KEYWORD, "FALSE"):
+            self.advance()
+            return res.success(BooleanNode(False))
+        elif tok.matches(TT_KEYWORD, "NOT"):
+            self.advance()
+            expr = res.register(self.atom())
+            if res.error:
+                return res
+            return res.success(UnaryOpNode(tok, expr))
         elif tok.type == TT_IDENTIFIER:
             self.advance()
 
