@@ -234,9 +234,9 @@ class Compiler:
             return self.builder.icmp_signed('==', left_value, right_value), self.type_map["bool"]
         elif node.op_tok.type == TT_NE:
             return self.builder.icmp_signed('!=', left_value, right_value), self.type_map["bool"]
-        elif op == '>=':
+        elif node.op_tok.type == TT_GTE:
             return self.builder.icmp_signed('>=', left_value, right_value), self.type_map["bool"]
-        elif op == '<=':
+        elif node.op_tok.type == TT_LTE:
             return self.builder.icmp_signed('<=', left_value, right_value), self.type_map["bool"]
 
         raise Exception(f"Unsupported binary operation: {node.op_tok.value}")

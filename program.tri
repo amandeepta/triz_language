@@ -1,15 +1,10 @@
-fn maz(a : int, b : int) : int {
-    b = a + b;
+fn riz() : int {
+    var b=20;
+    var a = 35;
+    if ( a > b ){
+        a=20;
+    }
     return b;
-}
-fn riz() : str {
-    var a;
-    a = 10;
-    var z = "aman";
-    var b;
-    b = 10;
-    var c = 10.1;
-    print("be");
-    return z;
-}
 
+
+}

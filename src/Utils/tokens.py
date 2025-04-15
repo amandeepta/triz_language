@@ -34,7 +34,7 @@ TT_TYPES = [
     'FLOAT',
     'VOID',
     'BOOL',
-    'STR'
+    'STR',
 ]
 # Keywords
 KEYWORDS = [
