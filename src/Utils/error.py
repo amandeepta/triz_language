@@ -8,21 +8,20 @@ class Error:
 
     def __str__(self):
         result  = f'{self.error_name}: {self.details}\n'
-        result += f'line {self.pos_start}'
         return result
+
 
 class IllegalCharError(Error):
     def __init__(self, pos_start, pos_end, details):
         super().__init__(pos_start, pos_end, 'Illegal Character', details)
 
-class InvalidSyntaxError:
+
+class InvalidSyntaxError(Error):
     def __init__(self, pos_start, pos_end, details):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        self.details = details
+        super().__init__(pos_start, pos_end, 'Invalid Syntax', details)
 
     def __str__(self):
-        return f"Invalid Syntax: {self.details} at position {self.pos_start}-{self.pos_end}"
+        return f"Invalid Syntax Error: {self.details} at position {self.pos_start}-{self.pos_end}"
 
 
 class RTError(Error):
@@ -31,4 +30,4 @@ class RTError(Error):
         self.context = context
 
     def __str__(self):
-        return f'Runtime Error: {self.details} Context : {self.context}'
+        return f'Runtime Error: {self.details} in {self.context} context at position {self.pos_start}-{self.pos_end}'

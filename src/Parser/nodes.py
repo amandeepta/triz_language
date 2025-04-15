@@ -14,6 +14,23 @@ class NumberNode:
         }
 
 
+class BooleanNode:
+    def __init__(self, tok):
+        self.tok = tok
+        self.pos_start = self.tok.pos_start
+        self.pos_end = self.tok.pos_end
+
+    def __repr__(self):
+        return f'BooleanNode({repr(self.tok)})'
+
+    def json(self):
+        return {
+            "type": "BooleanLiteral",
+            "value": self.tok.value
+        }
+
+        pass
+
 class BinOpNode:
     def __init__(self, left_node, op_tok, right_node):
         self.left_node = left_node
@@ -86,6 +103,8 @@ class VarReAssignNode:
             "name": self.var_name_tok.value,
             "value": self.value_node.json()
         }
+    
+
 
 
 class ReturnNode:
@@ -139,7 +158,6 @@ class ExpressionStatement:
             "expr": self.expr.json()
         }
 
-
 class FunctionNode:
     def __init__(self, func_name_tok, param_toks,return_type, body_node):
         self.func_name_tok = func_name_tok
@@ -164,6 +182,22 @@ class FunctionNode:
             } for param in self.param_toks],
             
             "body": self.body_node.json(),
+        }
+
+class StringNode:
+    def __init__(self, tok):
+        self.token = tok
+        self.pos_start = tok.pos_start
+        self.pos_end = tok.pos_end
+        self.type = "StringLiteral"
+
+    def __repr__(self):
+        return f'StringNode("{self.token.value}")'
+
+    def json(self):
+        return {
+            "type": self.type,
+            "value": self.token.value
         }
 
 
@@ -232,3 +266,64 @@ class BlockNode:
             "type": "Block",
             "statements": [stmt.json() for stmt in self.statements]
         }
+
+class IfNode:
+    def __init__(self, condition_node, then_node, else_node = None):
+        self.condition_node = condition_node
+        self.then_node = then_node
+        self.else_node = else_node
+
+        self.pos_start = self.condition_node.pos_start
+        self.pos_end = self.else_node.pos_end if self.else_node else self.then_node.pos_end
+
+    def __repr__(self):
+        if self.else_node:
+            return f"IfNode: {self.condition_node}, {self.then_node}, {self.else_node}"
+        else:
+            return f"IfNode: {self.condition_node}, {self.then_node}"
+        
+    def json(self):
+        return {
+            "type" : "IfStatement",
+            "condition" : self.condition_node.json(),
+            "then" : self.then_node.json(),
+            "else" : self.else_node.json() if self.else_node else None,
+        }
+
+class PrintNode:
+    def __init__(self, expr_nodes):
+        # expr_nodes is now a list of expression nodes
+        self.expr_nodes = expr_nodes
+        # The position information should be derived from the first and last expressions
+        self.pos_start = self.expr_nodes[0].pos_start
+        self.pos_end = self.expr_nodes[-1].pos_end
+
+    def __repr__(self):
+        # Update repr to represent multiple expressions
+        return f'PrintNode({repr(self.expr_nodes)})'
+
+    def json(self):
+        # Update json method to output the list of expressions
+        return {
+            "type": "PrintStatement",
+            "exprs": [expr_node.json() for expr_node in self.expr_nodes]
+        }
+
+class WhileNode:
+    def __init__(self, condition_node, body_node):
+        self.condition_node = condition_node
+        self.body_node = body_node
+
+        self.pos_start = condition_node.pos_start
+        self.pos_end = body_node.pos_end
+
+    def __repr__(self):
+        return f"WhileNode: {self.condition_node}, {self.body_node}"
+        
+    def json(self):
+        return {
+            "type" : "WhileStatement",
+            "condition" : self.condition_node.json(),
+            "then" : self.body_node.json(),
+        }
+    

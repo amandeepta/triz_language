@@ -1,10 +1,8 @@
-fn maz() : int {
-    var z = 10;
-    z = 100;
-    return z;
+fn ma() :str {
+    var i;
+    i = 0;
+    while (i < 10) {
+        print(i);
+    }
+    return "hello";
 }
-fn riz() : int {
-    var ab = maz();
-    return ab;
-}
-
