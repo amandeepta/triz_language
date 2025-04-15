@@ -3,6 +3,9 @@ fn riz() : int {
     var a = 35;
     if ( a > b ){
         a=20;
+        print(a);
+    } else {
+        print("else");
     }
     return b;
 
