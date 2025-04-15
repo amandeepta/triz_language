@@ -101,6 +101,52 @@ class Parser:
         var_name = self.current_tok
         next_tok = self.peek()
 
+        # Handle while statements
+        if self.current_tok.matches(TT_KEYWORD, "WHILE"):
+            self.advance() #consume while
+
+            if self.current_tok.type != TT_LPAREN:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '(' after WHILE",
+                ))
+            
+            self.advance() # consume '('
+
+            condition = res.register(self.bool_exp())
+            if res.error:
+                return res
+        
+            if self.current_tok.type != TT_RPAREN:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ')' after condition ends"
+                ))
+            self.advance()   #consume ')'
+
+
+            if self.current_tok.type != TT_LBRACE:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '{' after defining condition for WHILE",
+                ))
+            self.advance()
+
+            body = res.register(self.block())
+            if res.error:
+                return res
+            
+            return res.success(WhileNode(condition, body))
+
+
+
+
+
+
+
         # Handle print statement
         if self.current_tok.matches(TT_KEYWORD, "PRINT"):
             self.advance()
@@ -159,6 +205,8 @@ class Parser:
             return res
         return res.success(ExpressionStatement(expr))
     
+
+    #Handle if statements
     def if_block(self):
         res = ParseResult()
         self.advance()  #consume 'if'

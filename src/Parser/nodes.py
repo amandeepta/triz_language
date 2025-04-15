@@ -304,3 +304,22 @@ class PrintNode:
             "type": "PrintStatement",
             "expr": self.expr_node.json()
         }
+
+class WhileNode:
+    def __init__(self, condition_node, body_node):
+        self.condition_node = condition_node
+        self.body_node = body_node
+
+        self.pos_start = condition_node.pos_start
+        self.pos_end = body_node.pos_end
+
+    def __repr__(self):
+        return f"WhileNode: {self.condition_node}, {self.body_node}"
+        
+    def json(self):
+        return {
+            "type" : "WhileStatement",
+            "condition" : self.condition_node.json(),
+            "then" : self.body_node.json(),
+        }
+    

@@ -49,7 +49,11 @@ KEYWORDS = [
     'ELSE',
     'FALSE',
     'TRUE',
-    'PRINT'
+    'PRINT',
+    'WHILE',
+    'BREAK',
+    'CONTINUE',
+
 ]
 
 # Token class

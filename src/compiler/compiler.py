@@ -50,17 +50,45 @@ class Compiler:
                 self.__compile_return(node)
             elif isinstance(node, IfNode):
                 self.__compile_if(node)
+            elif isinstance(node, WhileNode):
+                self.__compile_while(node)
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
         
+    def __compile_while(self, node):
+        cond_block = self.builder.append_basic_block("while_cond")
+        body_block = self.builder.append_basic_block("while_body")
+        while_end = self.builder.append_basic_block("while_end")
+
+        self.builder.branch(cond_block)
+        self.builder.position_at_end(cond_block)
+
+        condition_value, condition_type = self.__resolve_value(node.condition_node)
+
+        if condition_type != self.type_map["bool"]:
+            raise Exception("Condition in WHILE statement must be of type 'bool'")
+        
+
+        self.builder.cbranch(condition_value, body_block, while_end)
+
+        self.builder.position_at_end(body_block)
+        self.__compile_block(node.body_node)
+
+        if not self.builder.block.is_terminated:
+            self.builder.branch(cond_block)
+
+        self.builder.position_at_end(while_end)
+
+
+        
     def __compile_if(self, node):
         condition_value, condition_type = self.__resolve_value(node.condition_node)
 
         if condition_type != self.type_map["bool"]:
-            raise Exception("Condition in 'if' statement must be of tyoe bool")
+            raise Exception("Condition in IF statement must be of type 'bool'")
         
         then_block = self.builder.append_basic_block("if_then")
         else_block = self.builder.append_basic_block("if_else") if node.else_node else None
