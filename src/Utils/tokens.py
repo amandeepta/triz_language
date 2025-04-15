@@ -36,7 +36,7 @@ TT_TYPES = [
     'BOOL',
     'STR',
 ]
-# Keywords
+
 KEYWORDS = [
     'VAR', 
     'CONST',
