@@ -2,12 +2,14 @@ fn maz(a : int, b : int) : int {
     b = a + b;
     return b;
 }
-fn riz() : int {
+fn riz() : str {
     var a;
     a = 10;
+    var z = "aman";
     var b;
-    b = 20;
-    var ab = maz(a, b);
-    return ab;
+    b = 10;
+    var c = 10.1;
+    print("be");
+    return z;
 }
 

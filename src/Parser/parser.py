@@ -93,6 +93,27 @@ class Parser:
         var_name = self.current_tok
         next_tok = self.peek()
 
+        # Handle print statement
+        if self.current_tok.matches(TT_KEYWORD, "PRINT"):
+            self.advance()
+
+            # Ensure that there is an expression to print
+            expr = res.register(self.expr())
+            if res.error:
+                return res
+
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    getattr(self.current_tok, 'pos_start', None),
+                    getattr(self.current_tok, 'pos_end', None),
+                    "Expected ';' after print statement"
+                ))
+            self.advance()
+
+            # Return the PrintNode
+            return res.success(PrintNode(expr))
+
+        # Handle variable assignment or reassignment
         if self.current_tok.type == TT_IDENTIFIER:
             if next_tok and next_tok.type == TT_EQ:
                 self.advance()
@@ -109,9 +130,11 @@ class Parser:
                 self.advance()
                 return res.success(VarReAssignNode(var_name, value))
 
+        # Handle function definitions
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
 
+        # Handle return statements
         if self.current_tok.matches(TT_KEYWORD, "RETURN"):
             return_stmt = self.return_stmt()
             if return_stmt.error:
@@ -119,10 +142,12 @@ class Parser:
                 return res.failure(return_stmt.error)
             return res.success(return_stmt.node)
 
+        # Default case: Parse expressions
         expr = res.register(self.expr())
         if res.error:
             return res
         return res.success(ExpressionStatement(expr))
+
 
     def return_stmt(self):
         res = ParseResult()
@@ -317,6 +342,9 @@ class Parser:
         elif tok.type in (TT_INT, TT_FLOAT):
             self.advance()
             return res.success(NumberNode(tok))
+        elif tok.type == TT_STR:
+            self.advance()
+            return res.success(StringNode(tok))
         elif tok.type == TT_IDENTIFIER:
             self.advance()
 
@@ -347,7 +375,6 @@ class Parser:
                 return res.success(FunctionCallNode(tok, arg_nodes))
 
             return res.success(VarAccessNode(tok))
-
         elif tok.type == TT_LPAREN:
             self.advance()
             expr = res.register(self.expr())

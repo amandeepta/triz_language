@@ -8,7 +8,6 @@ class Error:
 
     def __str__(self):
         result  = f'{self.error_name}: {self.details}\n'
-        result += f'  File "{self.pos_start.filename}", line {self.pos_start.line}, column {self.pos_start.column}'
         return result
 
 

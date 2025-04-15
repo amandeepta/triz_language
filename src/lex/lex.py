@@ -4,28 +4,29 @@ from src.Utils.error import Error
 from src.Utils.position import Position
 
 token_specs = [
+    (TT_STR,      r'"([^"\\]|\\.)*"'),  # Matches string literals like "hello", supports escaped quotes
     (TT_FLOAT,    r'\d+\.\d+'),
     (TT_INT,      r'\d+'),
     (TT_IDENTIFIER, r'[A-Za-z_][A-Za-z0-9_]*'),
     (TT_EE,       r'=='),
     (TT_NE,       r'!='),
-    (TT_LTE,      r'<='),
-    (TT_GTE,      r'>='),
-    (TT_EQ,       r'='),
-    (TT_LT,       r'<'),
-    (TT_GT,       r'>'),
-    (TT_PLUS,     r'\+'),
-    (TT_MINUS,    r'-'),
-    (TT_MUL,      r'\*'),
-    (TT_DIV,      r'/'),
-    (TT_MOD,      r'%'),
-    (TT_LPAREN,   r'\('),
-    (TT_RPAREN,   r'\)'),
-    (TT_LBRACE,   r'\{'),
-    (TT_RBRACE,   r'\}'),
-    (TT_SEMI,     r';'),
-    (TT_COLON,    r':'),
-    (TT_COMMA,    r','),
+    (TT_LTE,      r'<='), 
+    (TT_GTE,      r'>='), 
+    (TT_EQ,       r'='), 
+    (TT_LT,       r'<'), 
+    (TT_GT,       r'>'), 
+    (TT_PLUS,     r'\+'), 
+    (TT_MINUS,    r'-'), 
+    (TT_MUL,      r'\*'), 
+    (TT_DIV,      r'/'), 
+    (TT_MOD,      r'%'), 
+    (TT_LPAREN,   r'\('), 
+    (TT_RPAREN,   r'\)'), 
+    (TT_LBRACE,   r'\{'), 
+    (TT_RBRACE,   r'\}'), 
+    (TT_SEMI,     r';'), 
+    (TT_COLON,    r':'), 
+    (TT_COMMA,    r','), 
     ('SKIP',      r'[ \t\n\r]+'),
     ('MISMATCH',  r'.'),
 ]
@@ -56,9 +57,9 @@ class RegexLexer:
                 continue
             elif tok_type == 'MISMATCH':
                 return [], Error(
-                    "IllegalCharacter", 
-                    f"'{value}' is not valid", 
-                    start_pos.ln, 
+                    "IllegalCharacter",
+                    f"'{value}' is not valid",
+                    start_pos.ln,
                     start_pos.col
                 )
 
@@ -75,6 +76,8 @@ class RegexLexer:
                 value = int(value)
             elif tok_type == TT_FLOAT:
                 value = float(value)
+            elif tok_type == TT_STR:
+                value = bytes(value[1:-1], "utf-8").decode("unicode_escape")  # unescape strings
 
             tokens.append(Token(tok_type, value, start_pos, end_pos))
 
@@ -88,21 +91,12 @@ def run(text):
 
 
 if __name__ == "__main__":
-    test_code = """
-    fn maz(a: int, b: int): int {
-        b = a + b;
-        return b;
+    test_code = '''
+    fn greet(name: str): str {
+        var msg = "Hello, " + name;
+        return msg;
     }
-
-    fn riz(): int {
-        var a;
-        a = 10;
-        var b;
-        b = 20;
-        var ab = maz(a, b);
-        return ab;
-    }
-    """
+    '''
 
     tokens, error = run(test_code)
     if error:

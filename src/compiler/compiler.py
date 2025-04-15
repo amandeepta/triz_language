@@ -15,7 +15,11 @@ class Compiler:
             'void': ir.VoidType(),
             "INT": ir.IntType(32),
             "FLOAT": ir.FloatType(),
-            "VOID": ir.VoidType()
+            "VOID": ir.VoidType(),
+            "STRING": ir.IntType(8).as_pointer(),
+            "string": ir.IntType(8).as_pointer(),
+            "STR" : ir.IntType(8).as_pointer(),
+            "str" : ir.IntType(8).as_pointer(),
         }
         self.env = Environment()
 
@@ -39,7 +43,10 @@ class Compiler:
                 return self.__compile_function(node)
             elif isinstance(node, FunctionCallNode):
                 return self.__compile_function_call(node)
-            elif isinstance(node, ReturnNode):  # Handle ReturnNode
+            elif isinstance(node, PrintNode):
+                return self.__compile_print(node)
+
+            elif isinstance(node, ReturnNode):
                 self.__compile_return(node)
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
@@ -49,22 +56,17 @@ class Compiler:
 
     def __compile_function(self, node):
         func_name = node.func_name_tok.value
-
         param_types = [self.type_map[param_type_tok.value] for (_, param_type_tok) in node.param_toks]
-        return_type = self.type_map[node.return_type.value]
+        return_type = self.type_map.get(node.return_type.value if node.return_type else "int", self.type_map["int"])
 
-        # Check if function return type is void
         fn_type = ir.FunctionType(return_type, param_types)
-
         func = ir.Function(self.module, fn_type, name=func_name)
-
         block = func.append_basic_block(f"{func_name}_entry")
         self.builder = ir.IRBuilder(block)
-
         self.env = Environment(parent=self.env)
 
         for i, (param_name_tok, param_type_tok) in enumerate(node.param_toks):
-            llvm_type = self.type_map[param_type_tok.value]
+            llvm_type = self.type_map[param_type_tok.value] if param_type_tok.value != "string" else ir.IntType(8).as_pointer()
             ptr = self.builder.alloca(llvm_type, name=param_name_tok.value)
             self.builder.store(func.args[i], ptr)
             self.env.define(param_name_tok.value, ptr, llvm_type, initialized=True)
@@ -74,7 +76,7 @@ class Compiler:
                 return_value, inferred_type = self.__resolve_value(stmt.return_val)
                 if inferred_type != return_type:
                     raise Exception(f"Return type mismatch: Expected {return_type} but got {inferred_type}")
-                self.builder.ret(return_value)  # emit return here itself
+                self.builder.ret(return_value)
                 continue
             self.compile(stmt)
 
@@ -86,6 +88,45 @@ class Compiler:
                 self.builder.ret(default_ret)
 
         self.env = self.env.parent
+        
+    def __compile_print(self, node):
+        value, typ = self.__resolve_value(node.expr_node)
+
+        printf = self.module.globals.get('printf')
+        if printf is None:
+            voidptr_ty = ir.IntType(8).as_pointer()
+            printf_ty = ir.FunctionType(ir.IntType(32), [voidptr_ty], var_arg=True)
+            printf = ir.Function(self.module, printf_ty, name="printf")
+
+        fmt_str = None
+
+        if typ == self.type_map["string"]:
+            fmt_str = "%s\n\0"
+            args = [value]
+        elif typ == self.type_map["int"]:
+            fmt_str = "%d\n\0"
+            args = [value]
+        elif typ == self.type_map["float"]:
+            fmt_str = "%f\n\0"
+            args = [value]
+        elif typ == self.type_map["bool"]:
+            int_val = self.builder.zext(value, ir.IntType(32))
+            fmt_str = "%d\n\0"
+            args = [int_val]
+        else:
+            raise Exception(f"Print does not support type: {typ}")
+
+        fmt_bytes = bytearray(fmt_str.encode("utf8"))
+        const_fmt = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt_bytes)), fmt_bytes)
+        global_fmt = ir.GlobalVariable(self.module, const_fmt.type, name=f"print_fmt_{typ}")
+        global_fmt.linkage = 'internal'
+        global_fmt.global_constant = True
+        global_fmt.initializer = const_fmt
+
+        fmt_ptr = self.builder.bitcast(global_fmt, ir.IntType(8).as_pointer())
+        self.builder.call(printf, [fmt_ptr] + args)
+
+
 
     def __compile_function_call(self, node):
         func_name = node.func_name_tok.value
@@ -111,17 +152,14 @@ class Compiler:
 
     def __compile_return(self, node):
         return_value, _ = self.__resolve_value(node.return_val)
-
         self.builder.ret(return_value)
 
     def __compile_program(self, node):
         func_name = "main"
         param_type = []
         return_type = self.type_map["int"]
-
         fn_type = ir.FunctionType(return_type, param_type)
         func = ir.Function(self.module, fn_type, name=func_name)
-
         block = func.append_basic_block(f"{func_name}_entry")
         self.builder = ir.IRBuilder(block)
 
@@ -133,7 +171,7 @@ class Compiler:
             self.builder.ret(return_value)
 
         print(self.module)
-        return self.module 
+        return self.module
 
     def __compile_expression_statement(self, node):
         self.compile(node.expr)
@@ -222,6 +260,21 @@ class Compiler:
 
         return self.builder.load(ptr), typ
 
+    def __compile_string(self, node):
+        string_val = node.token.value
+        byte_array = bytearray(string_val.encode("utf8")) + b'\00'
+        const_array = ir.Constant(ir.ArrayType(ir.IntType(8), len(byte_array)), byte_array)
+
+        unique_name = f".str_{len(self.module.global_values)}"
+        global_str = ir.GlobalVariable(self.module, const_array.type, name=unique_name)
+        global_str.linkage = 'internal'
+        global_str.global_constant = True
+        global_str.initializer = const_array
+
+        ptr = self.builder.bitcast(global_str, ir.IntType(8).as_pointer())
+        return ptr, self.type_map["string"]
+
+
     def __resolve_value(self, node):
         if isinstance(node, NumberNode):
             val = node.tok.value
@@ -231,6 +284,8 @@ class Compiler:
                 return ir.Constant(self.type_map["float"], val), self.type_map["float"]
         elif isinstance(node, BinOpNode):
             return self.__compile_bin_op(node)
+        elif isinstance(node, StringNode):
+            return self.__compile_string(node)
         elif isinstance(node, VarAccessNode):
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionCallNode):
