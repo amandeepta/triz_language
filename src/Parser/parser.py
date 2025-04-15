@@ -7,7 +7,15 @@ PRECEDENCE = {
     TT_MINUS: 1,
     TT_MUL: 2,
     TT_DIV: 2,
-    TT_MOD: 2
+    TT_MOD: 2, 
+    TT_EE: 0,
+    TT_EQ : 0,
+    TT_EE : 0,
+    TT_NE : 0,
+    TT_GT : 0,
+    TT_LT : 0,
+    TT_GTE : 0,
+    TT_LTE : 0,
 }
 
 class ParseResult:
@@ -118,11 +126,104 @@ class Parser:
                 res.set_pos(self.current_tok)
                 return res.failure(return_stmt.error)
             return res.success(return_stmt.node)
+        
+        if self.current_tok.matches(TT_KEYWORD, "IF"):
+            return res.success(res.register(self.if_block()))
 
         expr = res.register(self.expr())
         if res.error:
             return res
         return res.success(ExpressionStatement(expr))
+    
+    def if_block(self):
+        res = ParseResult()
+        self.advance()  #consume 'if'
+
+        if self.current_tok.type != TT_LPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '(' after IF",
+            ))
+        self.advance()  #consume '('
+
+        #parse condition
+        condition = res.register(self.bool_exp())
+
+        if res.error:
+            return res
+        
+        
+        
+        if self.current_tok.type != TT_RPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected ')' after condition"
+            ))
+        self.advance()
+        
+        if self.current_tok.type != TT_LBRACE:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '{' after IF",
+            ))
+        self.advance()
+
+        then_block = res.register(self.block())
+        if res.error:
+            return res
+        
+        else_block = None
+        if self.current_tok.matches(TT_KEYWORD, "ELSE"):
+            self.advance()
+
+            if self.current_tok.matches(TT_KEYWORD, "IF"):
+                else_block = res.register(self.if_block())
+                if res.error:
+                    return res
+            
+            else:
+                if self.current_tok.type != TT_LBRACE:
+                    return res.failure(InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '{' after ELSE",
+                    ))
+                self.advance()
+                else_block = res.register(self.block())
+                if res.error:
+                    return res
+                
+        return res.success(IfNode(condition, then_block, else_block))
+    
+
+    def block(self):
+        res = ParseResult()
+
+        statements = []
+
+        while self.current_tok.type != TT_RBRACE and self.current_tok.type != TT_EOF:
+            stmt = res.register(self.statement())
+            if res.error:
+                return res
+            statements.append(stmt)
+            if self.current_tok.type == TT_SEMI:
+                self.advance()
+
+        if self.current_tok.type != TT_RBRACE:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '}' at end of block"
+            ))
+        self.advance()  
+        
+        return BlockNode(statements)
+
+
+        
 
     def return_stmt(self):
         res = ParseResult()
@@ -182,8 +283,88 @@ class Parser:
                 ))
             self.advance()
             return res.success(VarAssignNode(var_name, value))
-
+        
         return self.bin_op(self.atom, 0)
+    
+    def bool_exp(self):
+        return self.bin_op(self.comp_expr, 0)
+
+    def comp_expr(self):
+        res = ParseResult()
+
+        if self.current_tok.matches(TT_KEYWORD, 'NOT'):
+            op_tok = self.current_tok
+            res.register(self.advance())  # consume 'NOT'
+            node = res.register(self.comp_expr())
+            if res.error:
+                return res
+            return res.success(UnaryOpNode(op_tok, node))
+
+        left = res.register(self.arith_expr())
+        if res.error:
+            return res
+
+        if self.current_tok.type in (TT_EQ, TT_NE, TT_LT, TT_LTE, TT_GT, TT_GTE):
+            op_tok = self.current_tok
+            res.register(self.advance())  # consume the operator
+            right = res.register(self.arith_expr())
+            if res.error:
+                return res
+            return res.success(BinOpNode(left, op_tok, right))
+
+        return res.success(left)
+    
+    def arith_expr(self):
+        return self.bin_op(self.term, 1)
+
+    def term(self):
+        return self.bin_op(self.factor, 2)
+
+    def factor(self):
+        res = ParseResult()
+        tok = self.current_tok
+
+        if tok.type in (TT_PLUS, TT_MINUS):
+            # Handle unary plus and minus
+            op_tok = tok
+            self.advance()
+            factor = res.register(self.factor())
+            if res.error:
+                return res
+            return res.success(UnaryOpNode(op_tok, factor))
+        
+        # Handle numbers (integers or floats)
+        elif tok.type in (TT_INT, TT_FLOAT):
+            self.advance()
+            return res.success(NumberNode(tok))
+        
+        # Handle variables (identifiers)
+        elif tok.type == TT_IDENTIFIER:
+            self.advance()
+            return res.success(VarAccessNode(tok))
+        
+        # Handle parentheses (subexpressions)
+        elif tok.type == TT_LPAREN:
+            self.advance()
+            expr = res.register(self.expr())  # Parse inner expression
+            if res.error:
+                return res
+            if self.current_tok.type != TT_RPAREN:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected closing parenthesis ')'"
+                ))
+            self.advance()
+            return res.success(expr)
+
+        return res.failure(InvalidSyntaxError(
+            tok.pos_start,
+            tok.pos_end,
+            "Expected a number, variable, or opening parenthesis"
+        ))
+    
+    
 
     def bin_op(self, func, min_precedence):
         res = ParseResult()

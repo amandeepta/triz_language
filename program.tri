@@ -1,13 +1,9 @@
-fn maz(a : int, b : int) : int {
-    b = a + b;
-    return b;
-}
 fn riz() : int {
-    var a;
-    a = 10;
-    var b;
-    b = 20;
-    var ab = maz(a, b);
-    return ab;
-}
+    var a=20;
+    if ( 10 >20 ){
+        a = 35;
+    }
+    return 20;
 
+
+}

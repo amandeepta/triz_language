@@ -41,11 +41,44 @@ class Compiler:
                 return self.__compile_function_call(node)
             elif isinstance(node, ReturnNode):  # Handle ReturnNode
                 self.__compile_return(node)
+            elif isinstance(node, IfNode):
+                self.__compile_if(node)
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
+        
+    def __compile_if(self, node):
+        condition_value, condition_type = self.__resolve_value(node.condition_node)
+
+        if condition_type != self.type_map["bool"]:
+            raise Exception("Condition in 'if' statement must be of tyoe bool")
+        
+        then_block = self.builder.append_basic_block("if_then")
+        else_block = self.builder.append_basic_block("if_else") if node.else_node else None
+        merge_block = self.builder.append_basic_block("if_merge")
+
+        if else_block:
+            self.builder.cbranch(condition_value, then_block, else_block)
+        else:
+            self.builder.cbranch(condition_value, then_block, merge_block)
+
+        self.builder.position_at_end(then_block)
+        self.__compile_block(node.then_node)
+        if not self.builder.block.is_terminated:
+            self.builder.branch(merge_block)
+
+        if else_block:
+            self.builder.position_at_end(else_block)
+            self.__compile_block(node.else_node)
+            if not self.builder.block.is_terminated:
+                self.builder.branch(merge_block)
+
+        self.builder.position_at_end(merge_block)
+
+
+    
 
     def __compile_function(self, node):
         func_name = node.func_name_tok.value

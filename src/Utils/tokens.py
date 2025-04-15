@@ -3,6 +3,7 @@ from src.Utils.position import Position
 # Token types
 TT_INT = 'INT'
 TT_FLOAT = 'FLOAT'
+TT_BOOL = 'BOOL'
 TT_PLUS = 'PLUS'
 TT_IDENTIFIER = 'IDENTIFIER'
 TT_KEYWORD = 'KEYWORD'
