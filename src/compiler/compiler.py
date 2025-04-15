@@ -22,6 +22,8 @@ class Compiler:
             "str" : ir.IntType(8).as_pointer(),
         }
         self.env = Environment()
+        self.break_targets = []
+        self.continue_targets = []
 
     def compile(self, node):
         try:
@@ -52,6 +54,7 @@ class Compiler:
                 self.__compile_if(node)
             elif isinstance(node, WhileNode):
                 self.__compile_while(node)
+            
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
@@ -62,25 +65,34 @@ class Compiler:
         cond_block = self.builder.append_basic_block("while_cond")
         body_block = self.builder.append_basic_block("while_body")
         while_end = self.builder.append_basic_block("while_end")
-
+        self.break_targets.append(while_end)
+        self.continue_targets.append(cond_block)
+        
         self.builder.branch(cond_block)
         self.builder.position_at_end(cond_block)
 
+        # Resolve condition
         condition_value, condition_type = self.__resolve_value(node.condition_node)
 
         if condition_type != self.type_map["bool"]:
             raise Exception("Condition in WHILE statement must be of type 'bool'")
-        
 
+        # Conditional branch
         self.builder.cbranch(condition_value, body_block, while_end)
 
+        # Set up the body block
         self.builder.position_at_end(body_block)
+        
+        # Compile the block inside the while loop
         self.__compile_block(node.body_node)
 
+        # Check if a break needs to be handled
         if not self.builder.block.is_terminated:
             self.builder.branch(cond_block)
 
+        # Pop break and continue targets
         self.builder.position_at_end(while_end)
+
 
 
         
@@ -89,7 +101,7 @@ class Compiler:
 
         if condition_type != self.type_map["bool"]:
             raise Exception("Condition in IF statement must be of type 'bool'")
-        
+
         then_block = self.builder.append_basic_block("if_then")
         else_block = self.builder.append_basic_block("if_else") if node.else_node else None
         merge_block = self.builder.append_basic_block("if_merge")
@@ -99,18 +111,22 @@ class Compiler:
         else:
             self.builder.cbranch(condition_value, then_block, merge_block)
 
+        # Compile then block
         self.builder.position_at_end(then_block)
         self.__compile_block(node.then_node)
         if not self.builder.block.is_terminated:
             self.builder.branch(merge_block)
 
+        # Compile else block (if it exists)
         if else_block:
             self.builder.position_at_end(else_block)
             self.__compile_block(node.else_node)
             if not self.builder.block.is_terminated:
                 self.builder.branch(merge_block)
 
+        # Merge block
         self.builder.position_at_end(merge_block)
+
 
 
     
@@ -229,7 +245,14 @@ class Compiler:
 
     def __compile_block(self, node):
         for stmt in node.statements:
-            self.compile(stmt)
+            if isinstance(stmt, BreakNode):
+                # If it's a break statement, jump to the break target (exit point of the loop)
+                self.builder.branch(self.break_targets[-1])  # Jump to the while_end block
+            elif isinstance(stmt, ContinueNode):
+                # If it's a continue statement, jump to the continue target (loop condition)
+                self.builder.branch(self.continue_targets[-1])  # Jump to the loop's condition check
+            else :
+                self.compile(stmt)
 
     def __compile_return(self, node):
         return_value, _ = self.__resolve_value(node.return_val)

@@ -327,3 +327,30 @@ class WhileNode:
             "then" : self.body_node.json(),
         }
     
+class BreakNode:
+    def __init__(self, pos_start, pos_end):
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        self.type = "BreakStatement"
+
+    def __repr__(self):
+        return f"(break)"
+
+    def json(self):
+        return {
+            "type": "BreakStatement"
+        }
+
+class ContinueNode:
+    def __init__(self, pos_start, pos_end):
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        self.type = "ContinueStatement"
+
+    def __repr__(self):
+        return f"(continue)"
+
+    def json(self):
+        return {
+            "type": "ContinueStatement"
+        }

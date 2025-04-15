@@ -223,6 +223,34 @@ class Parser:
         # Handle function definitions
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
+        # Handle break statement
+        if self.current_tok.matches(TT_KEYWORD, "BREAK"):
+            pos_start = self.current_tok.pos_start
+            pos_end = self.current_tok.pos_end
+            self.advance()
+
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ';' after 'break'"
+                ))
+            self.advance()
+            return res.success(BreakNode(pos_start, pos_end))
+
+        if self.current_tok.matches(TT_KEYWORD, "CONTINUE"):
+            pos_start = self.current_tok.pos_start
+            pos_end = self.current_tok.pos_end
+            self.advance()
+
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ';' after 'continue'"
+                ))
+            self.advance()
+            return res.success(ContinueNode(pos_start, pos_end))
 
         # Handle return statements
         if self.current_tok.matches(TT_KEYWORD, "RETURN"):
