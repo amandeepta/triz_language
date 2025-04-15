@@ -1,7 +1,9 @@
-fn ma(a : int, b : float) : int {
-    var a = 10;
-    var b = 10.1;
-    a = 17;
-    return a;
-
+fn maz() : int {
+    var z = 10;
+    z = 100;
+    return z;
+}
+fn riz() : int {
+    var ab = maz();
+    return ab;
 }

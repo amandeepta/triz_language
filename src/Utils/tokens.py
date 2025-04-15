@@ -30,7 +30,8 @@ TT_EOF = 'EOF'
 TT_TYPES = [
     'INT',
     'FLOAT',
-    'VOID'
+    'VOID',
+    'BOOL'
 ]
 # Keywords
 KEYWORDS = [
@@ -41,6 +42,10 @@ KEYWORDS = [
     'NOT',
     'FN',
     'RETURN', 
+    'IF',
+    'ELSE',
+    'FALSE',
+    'TRUE',
 ]
 
 # Token class
