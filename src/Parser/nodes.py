@@ -14,6 +14,23 @@ class NumberNode:
         }
 
 
+class BooleanNode:
+    def __init__(self, tok):
+        self.tok = tok
+        self.pos_start = self.tok.pos_start
+        self.pos_end = self.tok.pos_end
+
+    def __repr__(self):
+        return f'BooleanNode({repr(self.tok)})'
+
+    def json(self):
+        return {
+            "type": "BooleanLiteral",
+            "value": self.tok.value
+        }
+
+        pass
+
 class BinOpNode:
     def __init__(self, left_node, op_tok, right_node):
         self.left_node = left_node
@@ -86,6 +103,8 @@ class VarReAssignNode:
             "name": self.var_name_tok.value,
             "value": self.value_node.json()
         }
+    
+
 
 
 class ReturnNode:
@@ -138,7 +157,6 @@ class ExpressionStatement:
             "type": "ExpressionStatement",
             "expr": self.expr.json()
         }
-
 
 class FunctionNode:
     def __init__(self, func_name_tok, param_toks,return_type, body_node):
@@ -247,6 +265,29 @@ class BlockNode:
         return {
             "type": "Block",
             "statements": [stmt.json() for stmt in self.statements]
+        }
+
+class IfNode:
+    def __init__(self, condition_node, then_node, else_node = None):
+        self.condition_node = condition_node
+        self.then_node = then_node
+        self.else_node = else_node
+
+        self.pos_start = self.condition_node.pos_start
+        self.pos_end = self.else_node.pos_end if self.else_node else self.then_node.pos_end
+
+    def __repr__(self):
+        if self.else_node:
+            return f"IfNode: {self.condition_node}, {self.then_node}, {self.else_node}"
+        else:
+            return f"IfNode: {self.condition_node}, {self.then_node}"
+        
+    def json(self):
+        return {
+            "type" : "IfStatement",
+            "condition" : self.condition_node.json(),
+            "then" : self.then_node.json(),
+            "else" : self.else_node.json() if self.else_node else None,
         }
 
 class PrintNode:

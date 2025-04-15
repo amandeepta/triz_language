@@ -3,6 +3,7 @@ from src.Utils.position import Position
 # Token types
 TT_INT = 'INT'
 TT_FLOAT = 'FLOAT'
+TT_BOOL = 'BOOL'
 TT_PLUS = 'PLUS'
 TT_IDENTIFIER = 'IDENTIFIER'
 TT_KEYWORD = 'KEYWORD'
@@ -32,7 +33,8 @@ TT_TYPES = [
     'INT',
     'FLOAT',
     'VOID',
-    'STR'
+    'BOOL',
+    'STR',
 ]
 # Keywords
 KEYWORDS = [
@@ -43,6 +45,10 @@ KEYWORDS = [
     'NOT',
     'FN',
     'RETURN', 
+    'IF',
+    'ELSE',
+    'FALSE',
+    'TRUE',
     'PRINT'
 ]
 
