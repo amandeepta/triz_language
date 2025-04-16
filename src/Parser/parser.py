@@ -96,54 +96,20 @@ class Parser:
 
         return res.success(program_node)
 
-    def statement(self):
+    def statement(self, inside_loop = False):
         res = ParseResult()
         var_name = self.current_tok
         next_tok = self.peek()
+        print(f"{var_name}, {next_tok} :: {inside_loop}")
 
         # Handle while statements
         if self.current_tok.matches(TT_KEYWORD, "WHILE"):
-            self.advance() #consume while
-
-            if self.current_tok.type != TT_LPAREN:
-                return res.failure(InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
-                    "Expected '(' after WHILE",
-                ))
-            
-            self.advance() # consume '('
-
-            condition = res.register(self.bool_exp())
-            if res.error:
-                return res
+            print(f"enter while")
+            return res.success(res.register(self.while_block()))
         
-            if self.current_tok.type != TT_RPAREN:
-                return res.failure(InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
-                    "Expected ')' after condition ends"
-                ))
-            self.advance()   #consume ')'
-
-
-            if self.current_tok.type != TT_LBRACE:
-                return res.failure(InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
-                    "Expected '{' after defining condition for WHILE",
-                ))
-            self.advance()
-
-            body = res.register(self.block())
-            if res.error:
-                return res
-            
-            return res.success(WhileNode(condition, body))
-
-
-
-
+        if self.current_tok.matches(TT_KEYWORD, "FOR"):
+            print(f"enter for :: ")
+            return self.for_block()
 
 
 
@@ -203,26 +169,50 @@ class Parser:
             return res.success(PrintNode(args))
 
 
-        # Handle variable assignment or reassignment
-        if self.current_tok.type == TT_IDENTIFIER:
-            if next_tok and next_tok.type == TT_EQ:
-                self.advance()
-                self.advance()
-                value = res.register(self.expr())
-                if res.error:
-                    return res.failure(res.error)
-                if self.current_tok.type != TT_SEMI:
-                    return res.failure(InvalidSyntaxError(
-                        getattr(self.current_tok, 'pos_start', None),
-                        getattr(self.current_tok, 'pos_end', None),
-                        "Expected ';' after assignment"
-                    ))
-                self.advance()
-                return res.success(VarReAssignNode(var_name, value))
-
         # Handle function definitions
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
+        
+        # Handle break statement
+        if self.current_tok.matches(TT_KEYWORD, "BREAK"):
+            if not inside_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "'break' statements can only be used inside loops"
+                ))
+            pos_start = self.current_tok.pos_start
+            pos_end = self.current_tok.pos_end
+            self.advance()
+
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ';' after 'break'"
+                ))
+            self.advance()
+            return res.success(BreakNode(pos_start, pos_end))
+
+        if self.current_tok.matches(TT_KEYWORD, "CONTINUE"):
+            if not inside_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "'cintinue' statements can only be used inside loops"
+                ))
+            pos_start = self.current_tok.pos_start
+            pos_end = self.current_tok.pos_end
+            self.advance()
+
+            if self.current_tok.type != TT_SEMI:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "Expected ';' after 'continue'"
+                ))
+            self.advance()
+            return res.success(ContinueNode(pos_start, pos_end))
 
         # Handle return statements
         if self.current_tok.matches(TT_KEYWORD, "RETURN"):
@@ -233,7 +223,8 @@ class Parser:
             return res.success(return_stmt.node)
         
         if self.current_tok.matches(TT_KEYWORD, "IF"):
-            return res.success(res.register(self.if_block()))
+            print(f"enter if  :: :: : " )
+            return res.success(res.register(self.if_block(inside_loop=inside_loop)))
 
         # Default case: Parse expressions
         expr = res.register(self.expr())
@@ -242,8 +233,112 @@ class Parser:
         return res.success(ExpressionStatement(expr))
     
 
+    #handle for block
+    def for_block(self):
+        res = ParseResult()
+
+        self.advance()  # consume 'for'
+
+        # Expect '(' after 'for'
+        if self.current_tok.type != TT_LPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected '(' after 'for'"
+            ))
+        self.advance()
+
+
+        # Parse initialization using expr() as it handles the 'var' keyword and assignment.
+        init = res.register(self.expr())
+        if res.error:
+            return res
+
+        # Parse loop condition
+        condition = res.register(self.expr())
+        if res.error:
+            return res
+
+        # Expect ';' after condition
+        if self.current_tok.type != TT_SEMI:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected ';' after condition"
+            ))
+        self.advance()
+
+        # Parse step expression
+        step_value = res.register(self.expr())
+        if res.error:
+            return res
+
+        # Expect ')' to close loop control section
+        if self.current_tok.type != TT_RPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected ')' after step value"
+            ))
+        self.advance()
+
+        # Expect '{' to begin block
+        if self.current_tok.type != TT_LBRACE:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected '{' to start for-loop body"
+            ))
+        self.advance()
+
+        # Parse the body block
+        body = res.register(self.block(inside_loop=True))
+        if res.error:
+            return res
+
+        # Successfully parsed a for-loop
+        return res.success(ForNode(init.var_name_tok, init.value_node, condition, step_value, body))
+    
+    def while_block(self):
+        res = ParseResult()
+        self.advance() #consume while
+
+        if self.current_tok.type != TT_LPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '(' after WHILE",
+            ))
+        
+        self.advance() # consume '('
+
+        condition = res.register(self.bool_exp())
+        if res.error:
+            return res
+    
+        if self.current_tok.type != TT_RPAREN:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected ')' after condition ends"
+            ))
+        self.advance()   #consume ')'
+
+
+        if self.current_tok.type != TT_LBRACE:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '{' after defining condition for WHILE",
+            ))
+        self.advance()
+
+        body = res.register(self.block(inside_loop = True))
+        if res.error:
+            return res
+        
+        return res.success(WhileNode(condition, body))
+
+
+
     #Handle if statements
-    def if_block(self):
+    def if_block(self, inside_loop = False):
         res = ParseResult()
         self.advance()  #consume 'if'
 
@@ -279,7 +374,7 @@ class Parser:
             ))
         self.advance()
 
-        then_block = res.register(self.block())
+        then_block = res.register(self.block(inside_loop=inside_loop))
         if res.error:
             return res
         
@@ -288,7 +383,7 @@ class Parser:
             self.advance()
 
             if self.current_tok.matches(TT_KEYWORD, "IF"):
-                else_block = res.register(self.if_block())
+                else_block = res.register(self.if_block(inside_loop=inside_loop))
                 if res.error:
                     return res
             
@@ -300,20 +395,20 @@ class Parser:
                         "Expected '{' after ELSE",
                     ))
                 self.advance()
-                else_block = res.register(self.block())
+                else_block = res.register(self.block(inside_loop=inside_loop))
                 if res.error:
                     return res
                 
         return res.success(IfNode(condition, then_block, else_block))
     
 
-    def block(self):
+    def block(self, inside_loop = False):
         res = ParseResult()
 
         statements = []
 
         while self.current_tok.type != TT_RBRACE and self.current_tok.type != TT_EOF:
-            stmt = res.register(self.statement())
+            stmt = res.register(self.statement(inside_loop=inside_loop))
             if res.error:
                 return res
             statements.append(stmt)
@@ -358,43 +453,78 @@ class Parser:
 
     def expr(self):
         res = ParseResult()
+        var_name = self.current_tok
+        next_tok = self.peek()
+
+        # Handle variable assignment or reassignment
+        if self.current_tok.type == TT_IDENTIFIER:
+            if next_tok and next_tok.type == TT_EQ:
+                return self.var_reassign(var_name)
 
         if self.current_tok.matches(TT_KEYWORD, 'VAR'):
-            self.advance()
-            if self.current_tok.type != TT_IDENTIFIER:
-                return res.failure(InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
-                    "Expected identifier"
-                ))
-            var_name = self.current_tok
-            self.advance()
-
-            if self.current_tok.type == TT_SEMI:
-                return res.success(VarAssignNode(var_name, None))
-
-            if self.current_tok.type != TT_EQ:
-                return res.failure(InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
-                    "Expected '=' for variable assignment"
-                ))
-            self.advance()
-
-            value = res.register(self.expr())
-            if res.error:
-                return res
-            if self.current_tok.type != TT_SEMI:
-                return res.failure(InvalidSyntaxError(
-                    getattr(self.current_tok, 'pos_start', None),
-                    getattr(self.current_tok, 'pos_end', None),
-                    "Expected ';' after variable assignment"
-                ))
-            self.advance()
-            return res.success(VarAssignNode(var_name, value))
+            return self.var_assign()
         
         return self.bin_op(self.atom, 0)
     
+    def var_assign(self):
+        res = ParseResult()
+
+        self.advance() #consume var
+        if self.current_tok.type != TT_IDENTIFIER:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected identifier"
+            ))
+        var_name = self.current_tok
+        self.advance()
+
+        if self.current_tok.type == TT_SEMI:
+            self.advance()
+            return res.success(VarAssignNode(var_name, None))
+
+        if self.current_tok.type != TT_EQ:
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start,
+                self.current_tok.pos_end,
+                "Expected '=' for variable assignment"
+            ))
+        self.advance()
+
+        value = res.register(self.expr())
+        if res.error:
+            return res
+        if self.current_tok.type != TT_SEMI:
+            return res.failure(InvalidSyntaxError(
+                getattr(self.current_tok, 'pos_start', None),
+                getattr(self.current_tok, 'pos_end', None),
+                "Expected ';' after variable assignment"
+            ))
+        self.advance()
+        return res.success(VarAssignNode(var_name, value))
+    
+    def var_reassign(self, var_name):
+        res = ParseResult()
+
+        self.advance()  # Skip the identifier
+        self.advance()  # Skip the '='
+
+        value = res.register(self.expr())
+        if res.error:
+            return res.failure(res.error)
+
+        if self.current_tok.type != TT_SEMI:
+            return res.failure(InvalidSyntaxError(
+                getattr(self.current_tok, 'pos_start', None),
+                getattr(self.current_tok, 'pos_end', None),
+                "Expected ';' after assignment"
+            ))
+        self.advance()
+
+        return res.success(VarReAssignNode(var_name, value))
+
+
+
     def bool_exp(self):
         return self.bin_op(self.comp_expr, 0)
 
@@ -430,7 +560,6 @@ class Parser:
         return self.bin_op(self.factor, 2)
 
     def factor(self):
-        print(f"debug:  enter factor for {self.current_tok}")
         res = ParseResult()
         tok = self.current_tok
 
@@ -683,5 +812,5 @@ class Parser:
         return res.failure(InvalidSyntaxError(
             tok.pos_start,
             tok.pos_end,
-            "Expected an expression"
+            f"Expected an expression"
         ))

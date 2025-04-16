@@ -53,6 +53,7 @@ KEYWORDS = [
     'WHILE',
     'BREAK',
     'CONTINUE',
+    'FOR',
 
 ]
 

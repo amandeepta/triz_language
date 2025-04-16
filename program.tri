@@ -1,8 +1,9 @@
-fn ma() :str {
-    var i;
-    i = 0;
-    while (i < 10) {
-        print(i);
-    }
-    return "hello";
+fn te(i : int, j :int) :int {
+    return i + j;
+}
+
+fn check(): int{
+    var i = 10;
+    var j = 20;
+    return te(i, j);
 }

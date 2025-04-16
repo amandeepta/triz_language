@@ -22,6 +22,8 @@ class Compiler:
             "str" : ir.IntType(8).as_pointer(),
         }
         self.env = Environment()
+        self.break_targets = []
+        self.continue_targets = []
 
     def compile(self, node):
         try:
@@ -52,35 +54,107 @@ class Compiler:
                 self.__compile_if(node)
             elif isinstance(node, WhileNode):
                 self.__compile_while(node)
+            elif isinstance(node, ForNode):
+                self.__compile_for(node)
+            
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
+        return self.module
+        
+    def __compile_for(self, node):
+        # --- Initialization ---
+        # Evaluate the starting value (e.g., for "var i = 0", compile 0)
+        init_value, init_type = self.__resolve_value(node.start_value_node)
+        var_name = node.var_name.value
+
+        # Allocate space for the loop variable and store the initial value.
+        var_ptr = self.builder.alloca(init_type, name=var_name)
+        self.builder.store(init_value, var_ptr)
+        self.env.define(var_name, var_ptr, init_type, initialized=True)
+        
+        # --- Create Basic Blocks ---
+        # Create blocks for the condition check, loop body, update (step), and after the loop.
+        cond_block = self.builder.append_basic_block("for_cond")
+        body_block = self.builder.append_basic_block("for_body")
+        update_block = self.builder.append_basic_block("for_update")
+        end_block = self.builder.append_basic_block("for_end")
+
+        self.break_targets.append(end_block)  # Add the exit block for break
+        self.continue_targets.append(cond_block)  # Add the condition block for continue
+        
+        # Jump to the condition block
+        self.builder.branch(cond_block)
+        
+        # --- Condition Block ---
+        self.builder.position_at_end(cond_block)
+        # Evaluate the loop condition; must be boolean.
+        condition_value, cond_type = self.__resolve_value(node.condition_node)
+        if cond_type != self.type_map["bool"]:
+            raise Exception("For loop condition must be of type 'bool'")
+        self.builder.cbranch(condition_value, body_block, end_block)
+        
+        # --- Loop Body Block ---
+        self.builder.position_at_end(body_block)
+        # Compile the loop body.
+        self.__compile_block(node.body_node)
+        
+
+        # When the body finishes (and if not terminated by a return), go to the update block.
+        if not self.builder.block.is_terminated:
+            self.builder.branch(update_block)
+        
+        # --- Update Block ---
+        self.builder.position_at_end(update_block)
+        # Evaluate the step expression (e.g., for "i = i + 1").
+        step_value, step_type = self.__resolve_value(node.step_value_node)
+        if step_type != init_type:
+            raise Exception("For loop step expression must match the type of the loop variable")
+        # Update the loop variable.
+        self.builder.store(step_value, var_ptr)
+        # Go back to the condition check.
+        self.builder.branch(cond_block)
+        
+        # --- End Block ---
+        self.builder.position_at_end(end_block)
+        # --- Pop break and continue targets ---
+        self.break_targets.pop()  # Pop the break target after loop ends
+        self.continue_targets.pop()  # Pop the continue target after loop ends
         
     def __compile_while(self, node):
         cond_block = self.builder.append_basic_block("while_cond")
         body_block = self.builder.append_basic_block("while_body")
         while_end = self.builder.append_basic_block("while_end")
-
+        self.break_targets.append(while_end)
+        self.continue_targets.append(cond_block)
+        
         self.builder.branch(cond_block)
         self.builder.position_at_end(cond_block)
 
+        # Resolve condition
         condition_value, condition_type = self.__resolve_value(node.condition_node)
 
         if condition_type != self.type_map["bool"]:
             raise Exception("Condition in WHILE statement must be of type 'bool'")
-        
 
+        # Conditional branch
         self.builder.cbranch(condition_value, body_block, while_end)
 
+        # Set up the body block
         self.builder.position_at_end(body_block)
+        
+        # Compile the block inside the while loop
         self.__compile_block(node.body_node)
 
+        # Check if a break needs to be handled
         if not self.builder.block.is_terminated:
             self.builder.branch(cond_block)
 
+        # Pop break and continue targets
         self.builder.position_at_end(while_end)
+
 
 
         
@@ -89,7 +163,7 @@ class Compiler:
 
         if condition_type != self.type_map["bool"]:
             raise Exception("Condition in IF statement must be of type 'bool'")
-        
+
         then_block = self.builder.append_basic_block("if_then")
         else_block = self.builder.append_basic_block("if_else") if node.else_node else None
         merge_block = self.builder.append_basic_block("if_merge")
@@ -99,18 +173,22 @@ class Compiler:
         else:
             self.builder.cbranch(condition_value, then_block, merge_block)
 
+        # Compile then block
         self.builder.position_at_end(then_block)
         self.__compile_block(node.then_node)
         if not self.builder.block.is_terminated:
             self.builder.branch(merge_block)
 
+        # Compile else block (if it exists)
         if else_block:
             self.builder.position_at_end(else_block)
             self.__compile_block(node.else_node)
             if not self.builder.block.is_terminated:
                 self.builder.branch(merge_block)
 
+        # Merge block
         self.builder.position_at_end(merge_block)
+
 
 
     
@@ -229,7 +307,14 @@ class Compiler:
 
     def __compile_block(self, node):
         for stmt in node.statements:
-            self.compile(stmt)
+            if isinstance(stmt, BreakNode):
+                # If it's a break statement, jump to the break target (exit point of the loop)
+                self.builder.branch(self.break_targets[-1])  # Jump to the while_end block
+            elif isinstance(stmt, ContinueNode):
+                # If it's a continue statement, jump to the continue target (loop condition)
+                self.builder.branch(self.continue_targets[-1])  # Jump to the loop's condition check
+            else :
+                self.compile(stmt)
 
     def __compile_return(self, node):
         return_value, _ = self.__resolve_value(node.return_val)
@@ -286,6 +371,7 @@ class Compiler:
             return self.builder.icmp_signed('>=', left_value, right_value), self.type_map["bool"]
         elif node.op_tok.type == TT_LTE:
             return self.builder.icmp_signed('<=', left_value, right_value), self.type_map["bool"]
+        
 
         raise Exception(f"Unsupported binary operation: {node.op_tok.value}")
 
@@ -302,13 +388,14 @@ class Compiler:
         var_name = node.var_name_tok.value
 
         if node.value_node is None:
-            ptr = self.builder.alloca(self.type_map["int"])
-            self.env.define(var_name, ptr, self.type_map["int"], initialized=False)
+            # Don't allocate memory or assign a type yet — just declare it in the environment
+            self.env.define(var_name, None, None, initialized=False)
         else:
             value, typ = self.__resolve_value(node.value_node)
 
             existing = self.env.lookup(var_name)
-            if existing is None:
+            if existing is None or existing[0] is None:
+                # Allocate now since this is the first assignment with known type
                 ptr = self.builder.alloca(typ)
                 self.builder.store(value, ptr)
                 self.env.define(var_name, ptr, typ, initialized=True)
@@ -322,6 +409,7 @@ class Compiler:
 
                 self.builder.store(value, ptr)
                 self.env.set_initialized(var_name)
+
 
     def __compile_var_reassign(self, node):
         var_name = node.var_name_tok.value
@@ -386,4 +474,18 @@ class Compiler:
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
+        
+        #different for varreaassign
+        elif isinstance(node, VarReAssignNode):
+            
+            var_name = node.var_name_tok.value
+            existing = self.env.lookup(var_name)
+             
+            if not existing:
+                raise Exception(f"Variable '{var_name}' not declared.")
+
+            ptr, existing_type, _ = existing
+            new_value, value_type = self.__resolve_value(node.value_node)
+            return new_value, existing_type
+
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")

@@ -13,6 +13,7 @@ def lex(text):
         return None
 
     print(tokens)
+    print("\n\n")
     return tokens
 
 def parse(tokens):
@@ -55,14 +56,14 @@ def main():
 
         if tokens and debug_parser:
             result = parse(tokens)
-            if result:
-                print(f"AST Tree: {result}")
+            
 
 
 
         if result and debug_compiler:
             if result:
                 print("AST:", result)
+                print("\n\n")
                 compile_ast(result)
 
     except FileNotFoundError:
