@@ -54,12 +54,65 @@ class Compiler:
                 self.__compile_if(node)
             elif isinstance(node, WhileNode):
                 self.__compile_while(node)
+            elif isinstance(node, ForNode):
+                self.__compile_for(node)
             
             else:
                 raise Exception(f"Unknown node type: {type(node)}")
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
+        
+    def __compile_for(self, node):
+        # --- Initialization ---
+        # Evaluate the starting value (e.g., for "var i = 0", compile 0)
+        init_value, init_type = self.__resolve_value(node.start_value_node)
+        var_name = node.var_name.value
+
+        # Allocate space for the loop variable and store the initial value.
+        var_ptr = self.builder.alloca(init_type, name=var_name)
+        self.builder.store(init_value, var_ptr)
+        self.env.define(var_name, var_ptr, init_type, initialized=True)
+        
+        # --- Create Basic Blocks ---
+        # Create blocks for the condition check, loop body, update (step), and after the loop.
+        cond_block = self.builder.append_basic_block("for_cond")
+        body_block = self.builder.append_basic_block("for_body")
+        update_block = self.builder.append_basic_block("for_update")
+        end_block = self.builder.append_basic_block("for_end")
+        
+        # Jump to the condition block
+        self.builder.branch(cond_block)
+        
+        # --- Condition Block ---
+        self.builder.position_at_end(cond_block)
+        # Evaluate the loop condition; must be boolean.
+        condition_value, cond_type = self.__resolve_value(node.condition_node)
+        if cond_type != self.type_map["bool"]:
+            raise Exception("For loop condition must be of type 'bool'")
+        self.builder.cbranch(condition_value, body_block, end_block)
+        
+        # --- Loop Body Block ---
+        self.builder.position_at_end(body_block)
+        # Compile the loop body.
+        self.__compile_block(node.body_node)
+        # When the body finishes (and if not terminated by a return), go to the update block.
+        if not self.builder.block.is_terminated:
+            self.builder.branch(update_block)
+        
+        # --- Update Block ---
+        self.builder.position_at_end(update_block)
+        # Evaluate the step expression (e.g., for "i = i + 1").
+        step_value, step_type = self.__resolve_value(node.step_value_node)
+        if step_type != init_type:
+            raise Exception("For loop step expression must match the type of the loop variable")
+        # Update the loop variable.
+        self.builder.store(step_value, var_ptr)
+        # Go back to the condition check.
+        self.builder.branch(cond_block)
+        
+        # --- End Block ---
+        self.builder.position_at_end(end_block)
         
     def __compile_while(self, node):
         cond_block = self.builder.append_basic_block("while_cond")
@@ -309,6 +362,7 @@ class Compiler:
             return self.builder.icmp_signed('>=', left_value, right_value), self.type_map["bool"]
         elif node.op_tok.type == TT_LTE:
             return self.builder.icmp_signed('<=', left_value, right_value), self.type_map["bool"]
+        
 
         raise Exception(f"Unsupported binary operation: {node.op_tok.value}")
 
@@ -409,5 +463,18 @@ class Compiler:
             return self.__compile_var_access(node)
         elif isinstance(node, FunctionCallNode):
             return self.__compile_function_call(node)
+        
+        #different for varreaassign
+        elif isinstance(node, VarReAssignNode):
+            
+            var_name = node.var_name_tok.value
+            existing = self.env.lookup(var_name)
+             
+            if not existing:
+                raise Exception(f"Variable '{var_name}' not declared.")
+
+            ptr, existing_type, _ = existing
+            new_value, value_type = self.__resolve_value(node.value_node)
+            return new_value, existing_type
 
         raise Exception(f"Unsupported node type for value resolution: {type(node)}")

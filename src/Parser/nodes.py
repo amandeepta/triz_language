@@ -327,6 +327,30 @@ class WhileNode:
             "then" : self.body_node.json(),
         }
     
+class ForNode:
+    def __init__(self, var_name, start_value_node, condition_node, step_value_node, body_node):
+        self.var_name = var_name                  # A token containing the variable's name.
+        self.start_value_node = start_value_node  # AST node for the starting value.
+        self.condition_node = condition_node      # AST node for the loop condition.
+        self.step_value_node = step_value_node    # AST node for the step (update) expression.
+        self.body_node = body_node                # AST node for the block of statements.
+
+        self.pos_start = var_name.pos_start
+        self.pos_end = body_node.pos_end
+
+    def __repr__(self):
+        return f"ForNode: ({self.var_name.value} , {self.start_value_node}; {self.condition_node}; {self.step_value_node}) {self.body_node}"
+
+    def json(self):
+        return {
+            "type": "ForStatement",
+            "var": self.var_name_tok.value,
+            "start": self.start_value_node.json(),
+            "end": self.end_value_node.json(),
+            "step": self.step_value_node.json() if self.step_value_node else None,
+            "body": self.body_node.json()
+        }
+    
 class BreakNode:
     def __init__(self, pos_start, pos_end):
         self.pos_start = pos_start
