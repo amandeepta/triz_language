@@ -96,16 +96,19 @@ class Parser:
 
         return res.success(program_node)
 
-    def statement(self):
+    def statement(self, inside_loop = False):
         res = ParseResult()
         var_name = self.current_tok
         next_tok = self.peek()
+        print(f"{var_name}, {next_tok} :: {inside_loop}")
 
         # Handle while statements
         if self.current_tok.matches(TT_KEYWORD, "WHILE"):
+            print(f"enter while")
             return res.success(res.register(self.while_block()))
         
         if self.current_tok.matches(TT_KEYWORD, "FOR"):
+            print(f"enter for :: ")
             return self.for_block()
 
 
@@ -169,8 +172,15 @@ class Parser:
         # Handle function definitions
         if self.current_tok.matches(TT_KEYWORD, "FN"):
             return res.success(res.register(self.func_def()))
+        
         # Handle break statement
         if self.current_tok.matches(TT_KEYWORD, "BREAK"):
+            if not inside_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "'break' statements can only be used inside loops"
+                ))
             pos_start = self.current_tok.pos_start
             pos_end = self.current_tok.pos_end
             self.advance()
@@ -185,6 +195,12 @@ class Parser:
             return res.success(BreakNode(pos_start, pos_end))
 
         if self.current_tok.matches(TT_KEYWORD, "CONTINUE"):
+            if not inside_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    "'cintinue' statements can only be used inside loops"
+                ))
             pos_start = self.current_tok.pos_start
             pos_end = self.current_tok.pos_end
             self.advance()
@@ -207,7 +223,8 @@ class Parser:
             return res.success(return_stmt.node)
         
         if self.current_tok.matches(TT_KEYWORD, "IF"):
-            return res.success(res.register(self.if_block()))
+            print(f"enter if  :: :: : " )
+            return res.success(res.register(self.if_block(inside_loop=inside_loop)))
 
         # Default case: Parse expressions
         expr = res.register(self.expr())
@@ -271,7 +288,7 @@ class Parser:
         self.advance()
 
         # Parse the body block
-        body = res.register(self.block())
+        body = res.register(self.block(inside_loop=True))
         if res.error:
             return res
 
@@ -312,7 +329,7 @@ class Parser:
             ))
         self.advance()
 
-        body = res.register(self.block())
+        body = res.register(self.block(inside_loop = True))
         if res.error:
             return res
         
@@ -321,7 +338,7 @@ class Parser:
 
 
     #Handle if statements
-    def if_block(self):
+    def if_block(self, inside_loop = False):
         res = ParseResult()
         self.advance()  #consume 'if'
 
@@ -357,7 +374,7 @@ class Parser:
             ))
         self.advance()
 
-        then_block = res.register(self.block())
+        then_block = res.register(self.block(inside_loop=inside_loop))
         if res.error:
             return res
         
@@ -366,7 +383,7 @@ class Parser:
             self.advance()
 
             if self.current_tok.matches(TT_KEYWORD, "IF"):
-                else_block = res.register(self.if_block())
+                else_block = res.register(self.if_block(inside_loop=inside_loop))
                 if res.error:
                     return res
             
@@ -378,20 +395,20 @@ class Parser:
                         "Expected '{' after ELSE",
                     ))
                 self.advance()
-                else_block = res.register(self.block())
+                else_block = res.register(self.block(inside_loop=inside_loop))
                 if res.error:
                     return res
                 
         return res.success(IfNode(condition, then_block, else_block))
     
 
-    def block(self):
+    def block(self, inside_loop = False):
         res = ParseResult()
 
         statements = []
 
         while self.current_tok.type != TT_RBRACE and self.current_tok.type != TT_EOF:
-            stmt = res.register(self.statement())
+            stmt = res.register(self.statement(inside_loop=inside_loop))
             if res.error:
                 return res
             statements.append(stmt)

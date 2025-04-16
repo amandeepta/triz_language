@@ -80,6 +80,9 @@ class Compiler:
         body_block = self.builder.append_basic_block("for_body")
         update_block = self.builder.append_basic_block("for_update")
         end_block = self.builder.append_basic_block("for_end")
+
+        self.break_targets.append(end_block)  # Add the exit block for break
+        self.continue_targets.append(cond_block)  # Add the condition block for continue
         
         # Jump to the condition block
         self.builder.branch(cond_block)
@@ -96,6 +99,8 @@ class Compiler:
         self.builder.position_at_end(body_block)
         # Compile the loop body.
         self.__compile_block(node.body_node)
+        
+
         # When the body finishes (and if not terminated by a return), go to the update block.
         if not self.builder.block.is_terminated:
             self.builder.branch(update_block)
@@ -113,6 +118,9 @@ class Compiler:
         
         # --- End Block ---
         self.builder.position_at_end(end_block)
+        # --- Pop break and continue targets ---
+        self.break_targets.pop()  # Pop the break target after loop ends
+        self.continue_targets.pop()  # Pop the continue target after loop ends
         
     def __compile_while(self, node):
         cond_block = self.builder.append_basic_block("while_cond")
