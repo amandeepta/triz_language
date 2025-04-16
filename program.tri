@@ -1,12 +1,12 @@
 fn test() : str {
-    var result = "start";
+    var result = "strif";
     
     for (var i = 0; i < 3; i = i + 1; ) {
         if (i == 2) {
             result = "breaking at i=2";
             break;  
         }
-        print("Looping i=" + i);
+        print("Looping i=",i);
     }
     
     return result;

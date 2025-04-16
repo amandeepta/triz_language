@@ -387,13 +387,14 @@ class Compiler:
         var_name = node.var_name_tok.value
 
         if node.value_node is None:
-            ptr = self.builder.alloca(self.type_map["int"])
-            self.env.define(var_name, ptr, self.type_map["int"], initialized=False)
+            # Don't allocate memory or assign a type yet — just declare it in the environment
+            self.env.define(var_name, None, None, initialized=False)
         else:
             value, typ = self.__resolve_value(node.value_node)
 
             existing = self.env.lookup(var_name)
-            if existing is None:
+            if existing is None or existing[0] is None:
+                # Allocate now since this is the first assignment with known type
                 ptr = self.builder.alloca(typ)
                 self.builder.store(value, ptr)
                 self.env.define(var_name, ptr, typ, initialized=True)
@@ -407,6 +408,7 @@ class Compiler:
 
                 self.builder.store(value, ptr)
                 self.env.set_initialized(var_name)
+
 
     def __compile_var_reassign(self, node):
         var_name = node.var_name_tok.value
