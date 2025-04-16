@@ -321,23 +321,24 @@ class Compiler:
         self.builder.ret(return_value)
 
     def __compile_program(self, node):
-        func_name = "main"
-        param_type = []
-        return_type = self.type_map["int"]
-        fn_type = ir.FunctionType(return_type, param_type)
-        func = ir.Function(self.module, fn_type, name=func_name)
-        block = func.append_basic_block(f"{func_name}_entry")
-        self.builder = ir.IRBuilder(block)
+        # The module doesn't need a function
+        self.builder = ir.IRBuilder()
 
+        # Compile each statement directly
         for stmt in node.statements:
             self.compile(stmt)
 
+        # Add a return statement at the end of the module if needed
         return_value = ir.Constant(self.type_map["int"], 0)
         if not self.builder.block.is_terminated:
             self.builder.ret(return_value)
 
+        # Print the generated LLVM IR for debugging
         print(self.module)
+
         return self.module
+
+
 
     def __compile_expression_statement(self, node):
         self.compile(node.expr)

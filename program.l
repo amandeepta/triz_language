@@ -5,30 +5,13 @@ target datalayout = ""
 define i32 @"main"()
 {
 main_entry:
+  %".2" = bitcast [6 x i8]* @".str_2" to i8*
+  %".3" = bitcast [4 x i8]* @"print_fmt_1" to i8*
+  %".4" = call i32 (i8*, ...) @"printf"(i8* %".3", i8* %".2")
+  ret i32 0
 }
 
-define i32 @"te"(i32 %".1", i32 %".2")
-{
-te_entry:
-  %"i" = alloca i32
-  store i32 %".1", i32* %"i"
-  %"j" = alloca i32
-  store i32 %".2", i32* %"j"
-  %".6" = load i32, i32* %"i"
-  %".7" = load i32, i32* %"j"
-  %".8" = add i32 %".6", %".7"
-  ret i32 %".8"
-}
+declare i32 @"printf"(i8* %".1", ...)
 
-define i32 @"check"()
-{
-check_entry:
-  %".2" = alloca i32
-  store i32 10, i32* %".2"
-  %".4" = alloca i32
-  store i32 20, i32* %".4"
-  %".6" = load i32, i32* %".2"
-  %".7" = load i32, i32* %".4"
-  %".8" = call i32 @"te"(i32 %".6", i32 %".7")
-  ret i32 %".8"
-}
+@".str_2" = internal constant [6 x i8] c"hello\00"
+@"print_fmt_1" = internal constant [4 x i8] c"%s\0a\00"

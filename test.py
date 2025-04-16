@@ -1,10 +1,12 @@
-from src.lex.lex import run  # Import the lexer function
-from src.Parser.parser import Parser  # Import the parser class
-from src.compiler.compiler import Compiler  # Import the compiler class
+from src.lex.lex import run
+from src.Parser.parser import Parser
+from src.compiler.compiler import Compiler
 
+import llvmlite.binding as llvm
+import os
+import subprocess
 
 def exec(text):
-    # Run lexer to get tokens and errors
     tokens, error = run(text)
     if error:
         print("Lexer Error:", error)
@@ -12,31 +14,69 @@ def exec(text):
 
     print("Tokens:", tokens)
 
-    # Create parser instance with the tokens
     parser = Parser(tokens)
     ast = parser.parse()
 
-    # Check if there is any parser error
     if ast.error:
         print("Parser Error:", ast.error)
         return None
 
-    # If no errors, return the AST node (root node of the AST)
     return ast.node
 
 
-def compile_ast(ast_node):
-    # Instantiate the compiler and compile the AST
+
+def compile_ast(ast_node, output_filename="program.l", exe_name="program.exe"):
     compiler = Compiler()
-    ir = compiler.compile(ast_node)
-    
-    if ir:
-        print("LLVM IR:")
-        print(ir)  # Print the generated LLVM IR
+
+    try:
+        llvm_ir = compiler.compile(ast_node)
+        if not llvm_ir:
+            print("Compilation failed: No IR returned.")
+            return
+
+        # Save LLVM IR to .ll
+        with open(output_filename, "w") as f:
+            f.write(str(llvm_ir))
+        print(f"[✓] LLVM IR saved to '{output_filename}'")
+
+        # Initialize LLVM
+        llvm.initialize()
+        llvm.initialize_native_target()
+        llvm.initialize_native_asmprinter()
+
+        # Parse IR and verify
+        mod = llvm.parse_assembly(str(llvm_ir))
+        mod.verify()
+
+        # Target machine for native code generation
+        target = llvm.Target.from_default_triple()
+        target_machine = target.create_target_machine()
+
+        # Emit object file
+        obj_code = target_machine.emit_object(mod)
+        obj_filename = "program.o"
+        with open(obj_filename, "wb") as f:
+            f.write(obj_code)
+        print(f"[✓] Object file generated: {obj_filename}")
+
+        # Link using clang
+        clang_cmd = f"clang {obj_filename} -o {exe_name}"
+        result = subprocess.run(clang_cmd, shell=True, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            print("[✗] Linking failed:")
+            print(result.stderr)
+        else:
+            print(f"[✓] Executable created: {exe_name}")
+
+    except Exception as e:
+        print("[✗] Compilation error:", e)
+
 
 
 def main():
-    filename = "program.tri"  # Hardcoded filename
+    filename = "program.tri"
+    output_file = "program.l"
 
     try:
         with open(filename, "r") as file:
@@ -46,7 +86,7 @@ def main():
 
         if result:
             print("AST:", result)
-            compile_ast(result)
+            compile_ast(result, output_file)
 
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")

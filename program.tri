@@ -1,9 +1,4 @@
-fn te(i : int, j :int) :int {
-    return i + j;
-}
-
-fn check(): int{
-    var i = 10;
-    var j = 20;
-    return te(i, j);
+fn main() : int {
+    print("hello");
+    return 0;
 }
