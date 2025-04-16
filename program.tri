@@ -1,13 +1,9 @@
-fn test() : str {
-    var result = "strif";
-    
-    for (var i = 0; i < 3; i = i + 1; ) {
-        if (i == 2) {
-            result = "breaking at i=2";
-            break;  
-        }
-        print("Looping i=",i);
-    }
-    
-    return result;
+fn te(i : int, j :int) :int {
+    return i + j;
+}
+
+fn check(): int{
+    var i = 10;
+    var j = 20;
+    return te(i, j);
 }

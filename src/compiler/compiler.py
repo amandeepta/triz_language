@@ -62,6 +62,7 @@ class Compiler:
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
+        return self.module
         
     def __compile_for(self, node):
         # --- Initialization ---
