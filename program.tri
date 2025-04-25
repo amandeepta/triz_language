@@ -1,9 +1,16 @@
-fn te(i : int, j :int) :int {
-    return i + j;
+fn hel(b : int, c : int) : int {
+    return b + c;
+}
+fn s() : str {
+    print("hello");
+    return "hello";
+}
+fn ma() : int {
+    var b = 10;
+    var c = 20;
+    var a = hel(b, c);
+    print("hello aman", a);
+
+    return 0;
 }
 
-fn check(): int{
-    var i = 10;
-    var j = 20;
-    return te(i, j);
-}
