@@ -1,4 +1,16 @@
-fn main() : int {
+fn hel(b : int, c : int) : int {
+    return b + c;
+}
+fn s() : str {
     print("hello");
+    return "hello";
+}
+fn ma() : int {
+    var b = 10;
+    var c = 20;
+    var a = hel(b, c);
+    print("hello aman", a);
+
     return 0;
 }
+
