@@ -13,71 +13,86 @@ app = Flask(__name__)
 CORS(app)
 
 def exec_ast(text):
+    print("[DEBUG] exec_ast: received text:", text)
     tokens, err = run(text)
     if err:
-        logging.error("Lexer error: %s", err)
+        print(f"[ERROR] exec_ast: lexer error: {err}")
         return None, f"Lexer error: {err}"
+    print("[DEBUG] exec_ast: tokens:", tokens)
     parser = Parser(tokens)
     ast = parser.parse()
     if ast.error:
-        logging.error("Parser error: %s", ast.error)
+        print(f"[ERROR] exec_ast: parser error: {ast.error}")
         return None, f"Parser error: {ast.error}"
-    logging.debug("AST generated: %r", ast.node)
+    print("[DEBUG] exec_ast: AST node:", ast.node)
     return ast.node, None
 
-def compile_ast(ast_node, output_basename="program"):
+def compile_ast(ast_node, base="program"):
+    print("[DEBUG] compile_ast: starting compilation")
     compiler = Compiler()
-    mod_ir, ir_text = compiler.compile(ast_node)
+    _, ir = compiler.compile(ast_node)
+    print("[DEBUG] compile_ast: generated LLVM IR:\n", ir)
+    ll = f"{base}.ll"
+    exe = f"{base}.exe" if os.name == "nt" else f"{base}.out"
+    print(f"[DEBUG] compile_ast: writing IR to {ll}")
+    with open(ll, "w") as f:
+        f.write(ir)
 
-    ll_path = f"{output_basename}.ll"
-    exe_path = f"{output_basename}{'.exe' if os.name == 'nt' else '.out'}"
-
-    with open(ll_path, "w") as f:
-        f.write(ir_text)
-    logging.debug("Wrote LLVM IR to %s", ll_path)
-
-    cc_env = os.environ.get("CC", "")
-    clang = shutil.which(cc_env) or shutil.which("clang") or shutil.which("clang.exe")
-    logging.debug("Locating clang: %s", clang)
+    cc = os.environ.get("CC", "")
+    clang = shutil.which(cc) or shutil.which("clang") or shutil.which("clang.exe")
+    print(f"[DEBUG] compile_ast: located clang at: {clang}")
     if not clang:
-        msg = "clang not found. Please install LLVM/Clang and add it to your PATH."
-        logging.error(msg)
+        msg = "clang not found"
+        print(f"[ERROR] compile_ast: {msg}")
+        return None, msg
+    
+    # Corrected MinGW paths for Windows
+    mingw_dir = "C:/MinGW"  # Make sure this is correct for your installation
+    clang_flags = [
+        clang, ll, "-o", exe, 
+        "--target=i686-w64-mingw32",  # Use i686 for 32-bit MinGW target
+        "-fuse-ld=lld", 
+        "-L", os.path.join(mingw_dir, "lib"),  # Ensure you're using 32-bit MinGW libraries
+        "-I", os.path.join(mingw_dir, "include"),  # Ensure the include path for MinGW headers
+        "-m32",  # Explicitly set 32-bit architecture
+    ]
+    print(f"[DEBUG] compile_ast: running clang with flags: {clang_flags}")
+    proc = subprocess.run(clang_flags, capture_output=True, text=True)
+
+    print(f"[DEBUG] compile_ast: clang return code: {proc.returncode}")
+    print(f"[DEBUG] compile_ast: clang stdout:\n{proc.stdout.strip()}")
+    print(f"[DEBUG] compile_ast: clang stderr:\n{proc.stderr.strip()}")
+    if proc.returncode != 0:
+        msg = proc.stderr.strip()
+        print(f"[ERROR] compile_ast: compilation failed: {msg}")
         return None, msg
 
-    proc = subprocess.run([clang, ll_path, "-o", exe_path], capture_output=True, text=True)
-    logging.debug("clang return code: %d", proc.returncode)
-    logging.debug("clang stderr: %s", proc.stderr.strip())
-    if proc.returncode != 0:
-        return None, proc.stderr.strip()
-
-    logging.debug("Compiled executable: %s", exe_path)
-    runner = subprocess.run([os.path.abspath(exe_path)], capture_output=True, text=True)
-    logging.debug("Program stdout: %s", runner.stdout.strip())
-    logging.debug("Program return code: %d", runner.returncode)
-
-    return {
-        "name": output_basename,
-        "stdout": runner.stdout.strip(),
-        "return": runner.returncode
-    }, None
+    abs_exe = os.path.abspath(exe)
+    print(f"[DEBUG] compile_ast: running executable {abs_exe}")
+    runp = subprocess.run([abs_exe], capture_output=True, text=True)
+    print(f"[DEBUG] compile_ast: program return code: {runp.returncode}")
+    print(f"[DEBUG] compile_ast: program stdout:\n{runp.stdout.strip()}")
+    return {"name": base, "stdout": runp.stdout.strip(), "return": runp.returncode}, None
 
 @app.route('/compile', methods=['POST'])
 def compile_code():
     data = request.get_json() or {}
+    print("[DEBUG] compile_code: received JSON:", data)
     code = data.get("inputCode", "").strip()
     if not code:
-        logging.error("No code provided")
+        print("[ERROR] compile_code: No code provided")
         return jsonify(error="No code provided"), 400
-
-    ast_node, lex_err = exec_ast(code)
-    if lex_err:
-        return jsonify(error=lex_err), 400
-
-    result, compile_err = compile_ast(ast_node)
-    if compile_err:
-        return jsonify(error=compile_err), 400
-
-    return jsonify(results=[result]), 200
+    ast_node, err = exec_ast(code)
+    if err:
+        print(f"[ERROR] compile_code: exec_ast error: {err}")
+        return jsonify(error=err), 400
+    res, err = compile_ast(ast_node)
+    if err:
+        print(f"[ERROR] compile_code: compile_ast error: {err}")
+        return jsonify(error=err), 500
+    print("[DEBUG] compile_code: successful result:", res)
+    return jsonify(results=[res]), 200
 
 if __name__ == "__main__":
+    print("[INFO] Starting Flask app...")
     app.run(debug=True)
