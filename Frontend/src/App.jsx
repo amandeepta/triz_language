@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import CodeEditor from "./components/CodeEditor";
 import InputArea from "./components/InputArea";
 import axios from "axios";
@@ -14,9 +14,8 @@ function App() {
     console.log("Input:\n", input);
 
     try {
-      const response = await axios.post("http://127.0.0.1:5000/", {
+      const response = await axios.post("http://127.0.0.1:5000/compile", {
         inputCode: code,
-        input: input,
       });
 
       console.log("Response data:", response.data);

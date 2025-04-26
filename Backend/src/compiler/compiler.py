@@ -1,19 +1,27 @@
-from llvmlite import ir
+from llvmlite import ir, binding
 from src.Parser.nodes import *
 from src.Utils.tokens import *
 from src.Utils.symbolTable import Environment
-
+binding.initialize()
+binding.initialize_native_target()
+binding.initialize_native_asmprinter()
 class Compiler:
     def __init__(self):
         self.module = ir.Module(name="my_module")
+        self.module.triple = binding.get_default_triple()
+        target = binding.Target.from_default_triple()
+        target_machine = target.create_target_machine()
+        self.module.data_layout = target_machine.target_data
         self.builder = ir.IRBuilder()
         self.type_map = {
             'int': ir.IntType(32),
+            'long': ir.IntType(64),
             'float': ir.FloatType(),
             'double': ir.DoubleType(),
             'bool': ir.IntType(1),
             'void': ir.VoidType(),
             "INT": ir.IntType(32),
+            "LONG" : ir.IntType(64),
             "FLOAT": ir.FloatType(),
             "VOID": ir.VoidType(),
             "STRING": ir.IntType(8).as_pointer(),
@@ -62,7 +70,7 @@ class Compiler:
         except Exception as e:
             print(f"[ERROR] Compilation failed: {str(e)}")
             raise e
-        return self.module
+        return self.module, str(self.module)
         
     def __compile_for(self, node):
         # --- Initialization ---
