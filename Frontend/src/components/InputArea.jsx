@@ -14,7 +14,7 @@ const InputArea = ({ input, setInput, onRun }) => {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Enter Input Here…"
-        className="flex-1 w-full p-2 border rounded font-mono bg-gray-100 resize-none"
+        className="h-100 w-full p-2 border border-gray-600 focus:outline-none focus:border-blue-500 font-mono bg-black text-gray-300 resize-none rounded-lg"
       />
     </div>
   );
