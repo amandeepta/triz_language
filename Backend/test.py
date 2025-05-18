@@ -104,7 +104,7 @@ def compile_code():
             'result': None,
             'error': compile_err
         }), 500
-   
+    print(res)
     return jsonify({
         'tokens': tokens,
         'ast': ast_repr,

@@ -23,70 +23,99 @@ function App() {
       });
 
       const data = response.data;
-      console.log("Response data:", data);
-
       setTokens(data.tokens || []);
       setAst(data.ast || null);
       setIr(data.ir || "");
-      setResult(data.result ? data.result[0] : null);
+      setResult(data.result ? data.result : null);
     } catch (err) {
       console.error("Error:", err);
-      setError("An error occurred while sending the code.");
+      setError("An error occurred while compiling the code.");
     }
   };
 
   return (
-    <div className="grid grid-cols-6 gap-4 h-screen bg-gray-800 p-4 text-gray-300">
-      <div className="col-span-4 flex flex-col">
-        <CodeEditor code={code} setCode={setCode} />
+    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-gray-200 font-sans">
+      {/* Header */}
+      <header className="flex justify-between items-center px-6 py-4 bg-[#1e293b] shadow-lg border-b border-gray-700">
+        <h1 className="text-2xl font-bold tracking-tight text-white">⚙️ Custom Compiler IDE</h1>
         <button
           onClick={handleRun}
-          className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform duration-150 text-sm font-semibold rounded-lg shadow"
         >
-          Run
+          ▶ Run Code
         </button>
-      </div>
+      </header>
 
-      <div className="col-span-2 flex flex-col space-y-4 overflow-auto">
-        <section className="p-2 border border-gray-600 rounded-lg bg-black">
-          <h2 className="font-bold mb-2">Lexer Tokens</h2>
-          <pre className="text-sm max-h-40 overflow-auto whitespace-pre-wrap">
-            {tokens.length > 0 ? JSON.stringify(tokens, null, 2) : "No tokens"}
-          </pre>
-        </section>
+      {/* Main Content */}
+      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 h-[calc(100vh-80px)]">
+        {/* Left Panel */}
+        <div className="lg:col-span-2 flex flex-col bg-[#0f172a] border border-gray-700 rounded-xl shadow-inner p-4 overflow-hidden">
+          <h2 className="text-xl font-semibold mb-3">📝 Code Editor</h2>
 
-        <section className="p-2 border border-gray-600 rounded-lg bg-black">
-          <h2 className="font-bold mb-2">Parser AST</h2>
-          <pre className="text-sm max-h-40 overflow-auto whitespace-pre-wrap">
-            {ast ? JSON.stringify(ast, null, 2) : "No AST"}
-          </pre>
-        </section>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <CodeEditor code={code} setCode={setCode} />
+          </div>
 
-        <section className="p-2 border border-gray-600 rounded-lg bg-black">
-          <h2 className="font-bold mb-2">LLVM IR</h2>
-          <pre className="text-sm max-h-40 overflow-auto whitespace-pre-wrap font-mono">
-            {ir || "No IR"}
-          </pre>
-        </section>
+          
+        </div>
 
-        <section className="p-2 border border-gray-600 rounded-lg bg-black">
-          <h2 className="font-bold mb-2">Execution Result</h2>
-          {error && <div className="text-red-500">{error}</div>}
-          {!error && result && (
-            <>
-              <div>
-                <strong>Output:</strong>
-                <pre className="whitespace-pre-wrap">{result.stdout || "(no output)"}</pre>
-              </div>
-              <div>
-                <strong>Return code:</strong> {result.return}
-              </div>
-            </>
-          )}
-          {!error && !result && <div>No result</div>}
-        </section>
-      </div>
+        {/* Right Panel */}
+        <div className="flex flex-col space-y-6 overflow-y-auto pr-1">
+          <OutputSection title="🧩 Lexer Tokens" content={tokens.length ? JSON.stringify(tokens, null, 2) : "No tokens"} />
+          <OutputSection title="🌲 Parser AST" content={ast ? JSON.stringify(ast, null, 2) : "No AST"} />
+          <OutputSection title="⚙️ LLVM IR" content={ir || "No IR"} isMono />
+          <ExecutionResult result={result} error={error} />
+        </div>
+      </main>
+
     </div>
+  );
+}
+
+// Output Display Component
+function OutputSection({ title, content, isMono = false }) {
+  return (
+    <section className="bg-[#1e293b] p-4 rounded-xl border border-gray-700 shadow-md transition hover:shadow-xl">
+      <h2 className="text-lg font-semibold mb-2">{title}</h2>
+      <pre
+        className={`text-sm max-h-40 overflow-auto whitespace-pre-wrap ${
+          isMono ? "font-mono" : ""
+        }`}
+      >
+        {content}
+      </pre>
+    </section>
+  );
+}
+
+// Execution Result Display
+function ExecutionResult({ result, error }) {
+  return (
+    <section className="bg-[#1e293b] p-4 rounded-xl border border-gray-700 shadow-md transition hover:shadow-xl">
+      <h2 className="text-lg font-semibold mb-2">💡 Execution Result</h2>
+
+      {error && (
+        <p className="text-red-500 font-medium">{error}</p>
+      )}
+
+      {!error && result && (
+        <>
+          <div className="mb-2">
+            <strong>Output:</strong>
+            <pre className="bg-[#0f172a] p-2 mt-1 rounded-md border border-gray-600 text-sm whitespace-pre-wrap">
+              {result.stdout || "(no output)"}
+            </pre>
+          </div>
+          <div>
+            <strong>Return Code:</strong> {result.return}
+          </div>
+        </>
+      )}
+
+      {!error && !result && (
+        <p className="text-gray-400 text-sm">No result yet.</p>
+      )}
+    </section>
   );
 }
 
