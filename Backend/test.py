@@ -94,7 +94,7 @@ def compile_code():
             'ir': None,
             'result': None,
             'error': err
-        }), 400
+        }), 200
     res, ir, compile_err = compile_ast(ast_node)
     if compile_err:
         return jsonify({
@@ -103,7 +103,7 @@ def compile_code():
             'ir': ir,
             'result': None,
             'error': compile_err
-        }), 500
+        }), 200
     print(res)
     return jsonify({
         'tokens': tokens,

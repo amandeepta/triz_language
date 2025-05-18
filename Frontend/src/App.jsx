@@ -21,8 +21,14 @@ function App() {
       const response = await axios.post("http://127.0.0.1:5000/compile", {
         inputCode: code,
       });
-
+      
+      
       const data = response.data;
+      if (data.error) {
+        console.log(data.error);
+        setError(data.error); // Show backend's error message
+        return;
+      }
       setTokens(data.tokens || []);
       setAst(data.ast || null);
       setIr(data.ir || "");
